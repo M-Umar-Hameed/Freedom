@@ -76,12 +76,23 @@ export default function RootLayout(): ReactNode {
 
   // Sync blocklists to Native VPN dynamically
   const keywords = useBlockingStore((s) => s.keywords);
+  const categories = useBlockingStore((s) => s.categories);
+  const includedUrls = useBlockingStore((s) => s.includedUrls);
+  const excludedUrls = useBlockingStore((s) => s.excludedUrls);
+  const adultBlockingEnabled = useBlockingStore((s) => s.adultBlockingEnabled);
 
   useEffect(() => {
     if (isMounted) {
       void ProtectionService.syncAllConfigs().catch(console.error);
     }
-  }, [keywords, isMounted]);
+  }, [
+    keywords,
+    categories,
+    includedUrls,
+    excludedUrls,
+    adultBlockingEnabled,
+    isMounted,
+  ]);
 
   // Route to appropriate screen on initial load
   useEffect(() => {

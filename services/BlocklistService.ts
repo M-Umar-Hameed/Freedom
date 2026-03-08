@@ -15,7 +15,11 @@ export const BlocklistService = {
     const allDomains: string[] = [];
 
     for (const category of state.categories) {
-      if (category.enabled && category.domains.length > 0) {
+      if (
+        state.adultBlockingEnabled &&
+        category.enabled &&
+        category.domains.length > 0
+      ) {
         for (const domain of category.domains) {
           allDomains.push(domain);
         }
@@ -193,6 +197,9 @@ export const BlocklistService = {
       useBlockingStore
         .getState()
         .updateCategoryDomains("hentai", hentaiDomainList);
+
+      // Immediately push updated domains to native VPN + Accessibility modules
+      await BlocklistService.syncBlocklistToNative();
 
       return true;
     } catch (error) {

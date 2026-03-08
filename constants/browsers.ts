@@ -16,7 +16,22 @@ export const BROWSERS: BrowserConfig[] = [
   {
     name: "Firefox",
     package: "org.mozilla.firefox",
-    urlBarId: "url_bar_title",
+    urlBarId: "mozac_browser_toolbar_url_view",
+  },
+  {
+    name: "Firefox Focus",
+    package: "org.mozilla.focus",
+    urlBarId: "mozac_browser_toolbar_url_view",
+  },
+  {
+    name: "Firefox Beta",
+    package: "org.mozilla.firefox_beta",
+    urlBarId: "mozac_browser_toolbar_url_view",
+  },
+  {
+    name: "Firefox Nightly",
+    package: "org.mozilla.fenix",
+    urlBarId: "mozac_browser_toolbar_url_view",
   },
   {
     name: "Samsung Internet",
