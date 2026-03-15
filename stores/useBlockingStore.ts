@@ -64,21 +64,14 @@ export const DEFAULT_SOURCES: BlocklistSource[] = [
   {
     id: "steven-black-porn",
     name: "StevenBlack (Porn)",
-    url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn/hosts",
+    url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts",
     format: "hosts",
     enabled: true,
   },
   {
-    id: "blocklist-project-porn",
-    name: "BlocklistProject (Porn)",
-    url: "https://raw.githubusercontent.com/blocklistproject/Lists/4fbe4d2ac6cf334130319556db6e44c8576a1299/porn.txt",
-    format: "domains",
-    enabled: true,
-  },
-  {
-    id: "bon-appetit-porn",
-    name: "Bon-Appetit (Porn Domains)",
-    url: "https://raw.githubusercontent.com/Bon-Appetit/porn-domains/refs/heads/main/block.c180c6fed4.45godp.txt",
+    id: "oisd-nsfw",
+    name: "oisd nsfw (Porn)",
+    url: "https://nsfw.oisd.nl/domainswild2",
     format: "domains",
     enabled: true,
   },
@@ -94,35 +87,10 @@ export const DEFAULT_SOURCES: BlocklistSource[] = [
 export const useBlockingStore = create<BlockingState>()(
   persist(
     (set) => ({
-      keywords: [
-        "porn",
-        "sex",
-        "hentai",
-        "xvideos",
-        "xnxx",
-        "xhamster",
-        "porntrex",
-        "xhaccess",
-      ],
+      keywords: [],
       includedUrls: [],
       excludedUrls: [],
-      categories: [
-        {
-          id: "adult",
-          name: "Adult Content",
-          description: "General adult and pornographic websites",
-          domains: [],
-          enabled: true,
-        },
-        {
-          id: "hentai",
-          name: "Hentai",
-          description:
-            "Animated adult content and manga. (Contains some manga sites; whitelist your fav manga/manhwa/manhua if needed)",
-          domains: [],
-          enabled: true,
-        },
-      ],
+      categories: [],
       adultBlockingEnabled: true,
       sources: DEFAULT_SOURCES,
       blockedApps: [],
