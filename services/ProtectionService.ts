@@ -4,7 +4,11 @@ import * as FreedomAccessibility from "@/modules/freedom-accessibility-service/s
 import * as FreedomVpn from "@/modules/freedom-vpn-service/src";
 import { BlockingCategory } from "@/types/blocking";
 import { useAppStore } from "@/stores/useAppStore";
-import { useBlockingStore } from "@/stores/useBlockingStore";
+import {
+  getActiveExcludedUrls,
+  getActiveIncludedUrls,
+  useBlockingStore,
+} from "@/stores/useBlockingStore";
 import { BlocklistService } from "./BlocklistService";
 
 /**
@@ -46,6 +50,7 @@ export const ProtectionService = {
   },
 
   _syncTimeout: null as ReturnType<typeof setTimeout> | null,
+  _pendingResolve: null as (() => void) | null,
   _lastUrlContent: "" as string, // Hash of last synced URLs
   _lastCategoryContent: "" as string, // Hash of last synced category config
 
@@ -67,8 +72,14 @@ export const ProtectionService = {
     if (ProtectionService._syncTimeout) {
       clearTimeout(ProtectionService._syncTimeout);
     }
+    // Resolve any previous pending promise so its await doesn't hang forever
+    if (ProtectionService._pendingResolve) {
+      ProtectionService._pendingResolve();
+      ProtectionService._pendingResolve = null;
+    }
 
     return new Promise((resolve) => {
+      ProtectionService._pendingResolve = resolve;
       ProtectionService._syncTimeout = setTimeout(() => {
         void (async () => {
           try {
@@ -78,9 +89,12 @@ export const ProtectionService = {
             await BlocklistService.syncCategoryFlagsToNative();
 
             // 2. Check what changed — avoid resending 100k+ category domains on every URL add
+            const activeIncluded = getActiveIncludedUrls();
+            const activeExcluded = getActiveExcludedUrls();
+
             const currentUrlContent = JSON.stringify({
-              included: state.includedUrls,
-              excluded: state.excludedUrls,
+              included: activeIncluded,
+              excluded: activeExcluded,
             });
             const currentCategoryContent = JSON.stringify(
               state.categories.map((c: BlockingCategory) => ({
@@ -104,14 +118,11 @@ export const ProtectionService = {
                 ProtectionService._lastCategoryContent = currentCategoryContent;
                 ProtectionService._lastUrlContent = currentUrlContent;
               } else if (urlsChanged) {
-                // Lightweight URL-only sync — update URL lists without resending all category domains
-                await FreedomAccessibility.setIncludedDomains(
-                  state.includedUrls,
-                );
-                await FreedomAccessibility.updateWhitelist(state.excludedUrls);
-                await FreedomVpn.setWhitelist(state.excludedUrls);
-                // VPN: send only user-included URLs (categories already loaded via addCategory)
-                await FreedomVpn.updateBlocklist(state.includedUrls);
+                // Lightweight URL-only sync — only enabled URLs
+                await FreedomAccessibility.setIncludedDomains(activeIncluded);
+                await FreedomAccessibility.updateWhitelist(activeExcluded);
+                await FreedomVpn.setWhitelist(activeExcluded);
+                await FreedomVpn.updateBlocklist(activeIncluded);
                 ProtectionService._lastUrlContent = currentUrlContent;
               }
             }
@@ -130,6 +141,7 @@ export const ProtectionService = {
           } catch (e) {
             console.error("[ProtectionService] Sync failed:", e);
           } finally {
+            ProtectionService._pendingResolve = null;
             resolve();
           }
         })();

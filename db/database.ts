@@ -32,6 +32,25 @@ export function initDB(): void {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    -- Blocklist source cache: stores HTTP conditional-request headers
+    CREATE TABLE IF NOT EXISTS source_cache (
+      source_id TEXT PRIMARY KEY,
+      etag TEXT DEFAULT '',
+      last_modified TEXT DEFAULT '',
+      content_hash TEXT DEFAULT ''
+    );
+
+    -- Cached parsed domains per source for fast re-sync
+    CREATE TABLE IF NOT EXISTS cached_domains (
+      source_id TEXT NOT NULL,
+      category_id TEXT NOT NULL,
+      domain TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_cached_domains_source
+      ON cached_domains(source_id);
+    CREATE INDEX IF NOT EXISTS idx_cached_domains_category
+      ON cached_domains(category_id);
   `);
 }
 
@@ -127,4 +146,164 @@ export function logBlockedUrl(url: string, timestamp?: number): void {
   } else {
     db.runSync(`INSERT INTO blocked_urls (url) VALUES (?);`, url);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Blocklist auto-update
+// ---------------------------------------------------------------------------
+
+const LAST_UPDATE_KEY = "blocklist_last_update";
+
+export function getLastBlocklistUpdate(): number {
+  const row = db.getFirstSync<{ value: string }>(
+    "SELECT value FROM kv_store WHERE key = ?",
+    LAST_UPDATE_KEY,
+  );
+  return row ? parseInt(row.value, 10) : 0;
+}
+
+export function setLastBlocklistUpdate(): void {
+  db.runSync(
+    `INSERT INTO kv_store (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    LAST_UPDATE_KEY,
+    String(Date.now()),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Blocklist source cache
+// ---------------------------------------------------------------------------
+
+export function getSourceCache(
+  sourceId: string,
+): { etag: string; lastModified: string; contentHash: string } | null {
+  const row = db.getFirstSync<{
+    etag: string;
+    last_modified: string;
+    content_hash: string;
+  }>(
+    `SELECT etag, last_modified, content_hash FROM source_cache WHERE source_id = ?`,
+    sourceId,
+  );
+  if (!row) return null;
+  return {
+    etag: row.etag,
+    lastModified: row.last_modified,
+    contentHash: row.content_hash,
+  };
+}
+
+/**
+ * Fast content fingerprint: samples head + tail + length.
+ * Not cryptographic — just for detecting blocklist changes.
+ */
+export function contentFingerprint(content: string): string {
+  const len = content.length;
+  const sample = content.slice(0, 8000) + content.slice(-8000) + String(len);
+  let h = 5381;
+  for (let i = 0; i < sample.length; i++) {
+    h = ((h << 5) + h + sample.charCodeAt(i)) | 0;
+  }
+  return h.toString(36);
+}
+
+/**
+ * Replace cached domains for a source and update its HTTP cache headers.
+ * Uses batch INSERT for speed (~300 rows per statement to stay under
+ * SQLite's 999-variable limit).
+ */
+export function saveSourceDomains(
+  sourceId: string,
+  categoryId: string,
+  etag: string,
+  lastModified: string,
+  contentHash: string,
+  domains: string[],
+): void {
+  db.execSync("BEGIN TRANSACTION");
+  try {
+    db.runSync("DELETE FROM cached_domains WHERE source_id = ?", sourceId);
+
+    const BATCH = 300;
+    for (let i = 0; i < domains.length; i += BATCH) {
+      const slice = domains.slice(i, i + BATCH);
+      const placeholders = slice.map(() => "(?,?,?)").join(",");
+      const params: string[] = [];
+      for (const d of slice) {
+        params.push(sourceId, categoryId, d);
+      }
+      db.runSync(
+        `INSERT INTO cached_domains (source_id, category_id, domain) VALUES ${placeholders}`,
+        params,
+      );
+    }
+
+    db.runSync(
+      `INSERT INTO source_cache (source_id, etag, last_modified, content_hash)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(source_id) DO UPDATE SET
+         etag = excluded.etag,
+         last_modified = excluded.last_modified,
+         content_hash = excluded.content_hash`,
+      sourceId,
+      etag,
+      lastModified,
+      contentHash,
+    );
+
+    db.execSync("COMMIT");
+  } catch (e) {
+    db.execSync("ROLLBACK");
+    throw e;
+  }
+}
+
+/**
+ * Read a batch of unique cached domains for a category (paginated).
+ * DISTINCT deduplicates domains that appear in multiple sources.
+ */
+export function readCachedDomainsBatch(
+  categoryId: string,
+  limit: number,
+  offset: number,
+): string[] {
+  const rows = db.getAllSync<{ domain: string }>(
+    "SELECT DISTINCT domain FROM cached_domains WHERE category_id = ? LIMIT ? OFFSET ?",
+    categoryId,
+    limit,
+    offset,
+  );
+  return rows.map((r) => r.domain);
+}
+
+/**
+ * Total unique cached domain count for a category.
+ */
+export function getCachedDomainCount(categoryId: string): number {
+  const row = db.getFirstSync<{ c: number }>(
+    "SELECT COUNT(DISTINCT domain) as c FROM cached_domains WHERE category_id = ?",
+    categoryId,
+  );
+  return row?.c ?? 0;
+}
+
+/**
+ * Remove cached domains for sources no longer in the enabled list.
+ */
+export function pruneDisabledSources(enabledSourceIds: string[]): void {
+  if (enabledSourceIds.length === 0) {
+    db.execSync("DELETE FROM cached_domains");
+    db.execSync("DELETE FROM source_cache");
+    return;
+  }
+  const placeholders = enabledSourceIds.map(() => "?").join(",");
+  db.runSync(
+    `DELETE FROM cached_domains WHERE source_id NOT IN (${placeholders})`,
+    enabledSourceIds,
+  );
+  db.runSync(
+    `DELETE FROM source_cache WHERE source_id NOT IN (${placeholders})`,
+    enabledSourceIds,
+  );
 }

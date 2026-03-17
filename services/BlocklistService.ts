@@ -1,6 +1,19 @@
+import {
+  contentFingerprint,
+  getCachedDomainCount,
+  getSourceCache,
+  pruneDisabledSources,
+  readCachedDomainsBatch,
+  saveSourceDomains,
+  setLastBlocklistUpdate,
+} from "@/db/database";
 import * as FreedomAccessibility from "@/modules/freedom-accessibility-service/src";
 import * as FreedomVpn from "@/modules/freedom-vpn-service/src";
-import { useBlockingStore } from "@/stores/useBlockingStore";
+import {
+  getActiveExcludedUrls,
+  getActiveIncludedUrls,
+  useBlockingStore,
+} from "@/stores/useBlockingStore";
 
 /**
  * BlocklistService — Manages domain blocklists on the JS side.
@@ -130,10 +143,13 @@ export const BlocklistService = {
       }
     }
 
-    // Sync included/excluded URLs (small lists — no batching needed)
+    // Sync included/excluded URLs (only enabled ones)
+    const activeIncluded = getActiveIncludedUrls();
+    const activeExcluded = getActiveExcludedUrls();
+
     try {
-      await FreedomAccessibility.setIncludedDomains(state.includedUrls);
-      await FreedomAccessibility.updateWhitelist(state.excludedUrls);
+      await FreedomAccessibility.setIncludedDomains(activeIncluded);
+      await FreedomAccessibility.updateWhitelist(activeExcluded);
     } catch (e) {
       console.warn(
         "[BlocklistService] Failed to sync URLs to Accessibility:",
@@ -142,8 +158,8 @@ export const BlocklistService = {
     }
 
     try {
-      await FreedomVpn.updateBlocklist(state.includedUrls);
-      await FreedomVpn.setWhitelist(state.excludedUrls);
+      await FreedomVpn.updateBlocklist(activeIncluded);
+      await FreedomVpn.setWhitelist(activeExcluded);
     } catch (e) {
       console.warn("[BlocklistService] Failed to sync URLs to VPN:", e);
     }
@@ -343,7 +359,6 @@ export const BlocklistService = {
       }
       return BlocklistService.parseDomainList(content);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.warn(`[BlocklistService] Failed to fetch ${url}:`, error);
       return [];
     }
@@ -366,7 +381,6 @@ export const BlocklistService = {
       // meta.json contains the current block filename
       const blockFile = meta.block || meta.blocklist;
       if (!blockFile) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[BlocklistService] Bon-Appetit meta.json missing block filename",
         );
@@ -382,7 +396,6 @@ export const BlocklistService = {
       const content = await response.text();
       return BlocklistService.parseDomainList(content);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.warn(
         "[BlocklistService] Failed to fetch Bon-Appetit list:",
         error,
@@ -406,9 +419,109 @@ export const BlocklistService = {
   },
 
   /**
-   * Fetch all enabled blocklists and send directly to native in batches.
-   * Each source is fetched, parsed, sent to native, then freed from JS memory
-   * to avoid accumulating 900k+ domain strings in the JS heap.
+   * Determine which category a source belongs to.
+   */
+  getCategoryForSource: (source: { id: string; name: string }): string => {
+    const isHentai =
+      source.id === "hentai-refined" ||
+      source.id === "hentai-blocklist" ||
+      source.name.toLowerCase().includes("hentai");
+    return isHentai ? "hentai" : "adult";
+  },
+
+  /**
+   * Fetch a source with HTTP conditional request (ETag / Last-Modified).
+   * Returns null if the source has not changed (304 or matching content hash).
+   * Returns the parsed domain/keyword list if it changed.
+   */
+  fetchSourceWithCache: async (
+    sourceId: string,
+    url: string,
+    format: "domains" | "hosts" | "keywords",
+  ): Promise<{
+    changed: boolean;
+    list: string[];
+    etag: string;
+    lastModified: string;
+    hash: string;
+  }> => {
+    const cached = getSourceCache(sourceId);
+
+    // For complex URLs (comma-separated, Bon-Appetit), skip conditional request
+    // and use content hash comparison instead.
+    const isSimpleUrl = !url.includes(",") && !url.endsWith("meta.json");
+
+    const headers: Record<string, string> = {};
+    if (cached && isSimpleUrl) {
+      if (cached.etag) headers["If-None-Match"] = cached.etag;
+      if (cached.lastModified)
+        headers["If-Modified-Since"] = cached.lastModified;
+    }
+
+    let content: string;
+    let etag = "";
+    let lastModified = "";
+
+    if (isSimpleUrl) {
+      const response = await fetch(url, { headers });
+      if (response.status === 304) {
+        return {
+          changed: false,
+          list: [],
+          etag: cached?.etag ?? "",
+          lastModified: cached?.lastModified ?? "",
+          hash: cached?.contentHash ?? "",
+        };
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      content = await response.text();
+      etag = response.headers.get("etag") ?? "";
+      lastModified = response.headers.get("last-modified") ?? "";
+    } else {
+      // Complex URL — fetch normally via existing helper
+      const list = await BlocklistService.fetchRemoteList(url, format);
+      // Can't get raw content for hash, use list length + sample as proxy
+      const hash = contentFingerprint(list.join("\n"));
+      if (cached?.contentHash === hash) {
+        return { changed: false, list: [], etag: "", lastModified: "", hash };
+      }
+      return { changed: true, list, etag: "", lastModified: "", hash };
+    }
+
+    const hash = contentFingerprint(content);
+    if (cached?.contentHash === hash) {
+      return { changed: false, list: [], etag, lastModified, hash };
+    }
+
+    const list =
+      format === "keywords"
+        ? BlocklistService.parseKeywordList(content)
+        : BlocklistService.parseDomainList(content);
+
+    return { changed: true, list, etag, lastModified, hash };
+  },
+
+  /**
+   * Push all cached domains for a category from SQLite to native (VPN + A11y).
+   * Reads in pages to avoid loading 500k+ strings into JS at once.
+   */
+  syncCategoryFromCache: async (categoryId: string): Promise<void> => {
+    const PAGE = 10000;
+    const totalCached = getCachedDomainCount(categoryId);
+    for (let offset = 0; offset < totalCached; offset += PAGE) {
+      const batch = readCachedDomainsBatch(categoryId, PAGE, offset);
+      if (batch.length === 0) break;
+      await FreedomVpn.addCategory(categoryId, batch);
+      await FreedomAccessibility.appendCategoryDomains(categoryId, batch);
+    }
+  },
+
+  /**
+   * Fetch all enabled blocklists, cache in SQLite, and sync to native.
+   *
+   * Uses HTTP conditional requests (ETag / Last-Modified) + content hashing
+   * to skip sources that haven't changed since the last update.
+   * Only categories with at least one changed source are re-synced to native.
    */
   updateBlocklists: async (
     onProgress?: (progress: number, total: number, name: string) => void,
@@ -419,111 +532,140 @@ export const BlocklistService = {
 
       if (enabledSources.length === 0) return true;
 
-      const total = enabledSources.length + 1; // +1 for finalize step
+      // Remove cached data for sources that are no longer enabled
+      pruneDisabledSources(enabledSources.map((s) => s.id));
 
-      // Clear existing categories before re-populating
-      try {
-        await FreedomVpn.removeCategory("adult");
-        await FreedomVpn.removeCategory("hentai");
-      } catch {
-        // ignore — categories might not exist yet
-      }
-
-      let adultCount = 0;
-      let hentaiCount = 0;
+      const total = enabledSources.length + 1;
+      const dirtyCategories = new Set<string>();
       const fetchedKeywords: string[] = [];
 
-      // Process each source individually: fetch → parse → send to native → free
+      // Phase 1: Check each source for changes
       for (let i = 0; i < enabledSources.length; i++) {
         const source = enabledSources[i];
-        onProgress?.(i + 1, total, `Fetching ${source.name}...`);
-
-        // Yield to UI thread so progress renders
+        onProgress?.(i + 1, total, `Checking ${source.name}...`);
         await new Promise((r) => setTimeout(r, 0));
 
-        const list = await BlocklistService.fetchRemoteList(
-          source.url,
-          source.format,
-        );
+        try {
+          const result = await BlocklistService.fetchSourceWithCache(
+            source.id,
+            source.url,
+            source.format,
+          );
 
-        if (list.length === 0) continue;
+          if (!result.changed) {
+            // eslint-disable-next-line no-console
+            console.log(
+              `[BlocklistService] ${source.name}: unchanged (cache hit)`,
+            );
+            continue;
+          }
 
-        if (source.format === "keywords") {
-          fetchedKeywords.push(...list);
+          if (result.list.length === 0) continue;
+
+          if (source.format === "keywords") {
+            fetchedKeywords.push(...result.list);
+            continue;
+          }
+
+          const categoryId = BlocklistService.getCategoryForSource(source);
+          saveSourceDomains(
+            source.id,
+            categoryId,
+            result.etag,
+            result.lastModified,
+            result.hash,
+            result.list,
+          );
+          dirtyCategories.add(categoryId);
+          // eslint-disable-next-line no-console
+          console.log(
+            `[BlocklistService] ${source.name}: ${result.list.length} domains cached`,
+          );
+        } catch (e) {
+          console.warn(`[BlocklistService] Failed to fetch ${source.name}:`, e);
+        }
+      }
+
+      // Phase 2: Re-sync dirty categories from SQLite to native
+      onProgress?.(total, total, "Syncing to native...");
+      await new Promise((r) => setTimeout(r, 0));
+
+      for (const categoryId of ["adult", "hentai"]) {
+        if (!dirtyCategories.has(categoryId)) {
+          // Nothing changed — native already has correct data from its own
+          // persistence files. Just update the UI count from SQLite DISTINCT.
+          const cachedCount = getCachedDomainCount(categoryId);
+          if (cachedCount > 0) {
+            useBlockingStore
+              .getState()
+              .setCategoryDomainCount(categoryId, cachedCount);
+          }
           continue;
         }
 
-        // Determine category
-        const isHentai =
-          source.id === "hentai-refined" ||
-          source.name.toLowerCase().includes("hentai");
-        const categoryId = isHentai ? "hentai" : "adult";
+        // Clear native category and re-populate from SQLite cache
+        try {
+          await FreedomVpn.removeCategory(categoryId);
+          await FreedomAccessibility.clearCategoryDomains(categoryId);
+        } catch {
+          /* ignore */
+        }
 
-        // Batch-send this source's domains to native immediately, then discard
-        await BlocklistService.sendInBatches(list, async (batch) => {
-          await FreedomVpn.addCategory(categoryId, batch);
-          await FreedomAccessibility.appendCategoryDomains(categoryId, batch);
-        });
+        await BlocklistService.syncCategoryFromCache(categoryId);
 
-        if (isHentai) hentaiCount += list.length;
-        else adultCount += list.length;
-
-        // list goes out of scope here — GC can free it
+        try {
+          await FreedomAccessibility.finalizeCategorySync(categoryId);
+        } catch (e) {
+          console.warn("[BlocklistService] finalizeCategorySync warning:", e);
+        }
       }
 
-      // Finalize: persist + rebuild active domains on native side
-      onProgress?.(total, total, "Finalizing...");
-      await new Promise((r) => setTimeout(r, 0));
-
-      try {
-        if (adultCount > 0)
-          await FreedomAccessibility.finalizeCategorySync("adult");
-        if (hentaiCount > 0)
-          await FreedomAccessibility.finalizeCategorySync("hentai");
-      } catch (e) {
-        console.warn("[BlocklistService] finalizeCategorySync warning:", e);
+      // Update counts: use native count for dirty categories (just re-synced),
+      // SQLite DISTINCT count for clean categories (already set above).
+      for (const categoryId of ["adult", "hentai"]) {
+        if (dirtyCategories.has(categoryId)) {
+          const nativeCount =
+            await FreedomAccessibility.getCategoryDomainCount(categoryId);
+          useBlockingStore
+            .getState()
+            .setCategoryDomainCount(categoryId, nativeCount);
+        }
       }
 
+      const counts = useBlockingStore.getState().categoryDomainCounts;
+      const adultCount = counts.adult ?? 0;
+      const hentaiCount = counts.hentai ?? 0;
       // eslint-disable-next-line no-console
       console.log(
-        `[BlocklistService] Synced ${adultCount} adult + ${hentaiCount} hentai domains`,
+        `[BlocklistService] Synced ${adultCount} adult + ${hentaiCount} hentai domains (unique)`,
       );
 
-      // Store only domain counts in Zustand
-      useBlockingStore.getState().setCategoryDomainCount("adult", adultCount);
-      useBlockingStore.getState().setCategoryDomainCount("hentai", hentaiCount);
-
-      // Snapshot so syncAllConfigs doesn't re-trigger domain sync
-      // (import is deferred to avoid circular dependency)
       const { ProtectionService } =
         await import("@/services/ProtectionService");
       ProtectionService.snapshotCategoryContent();
 
-      // Merge fetched keywords with existing user keywords
+      // Merge fetched keywords
       if (fetchedKeywords.length > 0) {
         const currentKeywords = useBlockingStore.getState().keywords;
         const merged = new Set([...currentKeywords, ...fetchedKeywords]);
         useBlockingStore.getState().setKeywords([...merged]);
-        // eslint-disable-next-line no-console
-        console.log(
-          `[BlocklistService] Keywords updated: ${currentKeywords.length} -> ${merged.size}`,
-        );
       }
 
-      // Enable category flags so ContentMatcher knows to check them
+      // Sync flags, keywords, URLs
       await BlocklistService.syncCategoryFlagsToNative();
-
-      // Sync URLs and keywords (small lists)
       await BlocklistService.syncKeywordsToNative();
       try {
-        await FreedomAccessibility.setIncludedDomains(state.includedUrls);
-        await FreedomAccessibility.updateWhitelist(state.excludedUrls);
-        await FreedomVpn.updateBlocklist(state.includedUrls);
-        await FreedomVpn.setWhitelist(state.excludedUrls);
+        const inclUrls = getActiveIncludedUrls();
+        const exclUrls = getActiveExcludedUrls();
+        await FreedomAccessibility.setIncludedDomains(inclUrls);
+        await FreedomAccessibility.updateWhitelist(exclUrls);
+        await FreedomVpn.updateBlocklist(inclUrls);
+        await FreedomVpn.setWhitelist(exclUrls);
       } catch (e) {
         console.warn("[BlocklistService] Failed to sync URLs:", e);
       }
 
+      setLastBlocklistUpdate();
       return true;
     } catch (error) {
       console.error("[BlocklistService] Failed to update blocklists:", error);

@@ -1,8 +1,11 @@
 import { sqliteStorage } from "@/db/database";
 import type {
   BlockedApp,
+  BlockedUrl,
   BlockingCategory,
   BlocklistSource,
+  ControlMode,
+  SurveillanceConfig,
 } from "@/types/blocking";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -12,12 +15,16 @@ export interface BlockingState {
   keywords: string[];
 
   // Websites
-  includedUrls: string[];
-  excludedUrls: string[];
+  includedUrls: BlockedUrl[];
+  excludedUrls: BlockedUrl[];
+  siteControlMode: ControlMode;
+  siteSurveillance: SurveillanceConfig;
 
   // Categories
   categories: BlockingCategory[];
   adultBlockingEnabled: boolean;
+  adultControlMode: ControlMode;
+  adultSurveillance: SurveillanceConfig;
   categoryDomainCounts: Record<string, number>;
 
   // Custom Sources
@@ -35,8 +42,12 @@ export interface BlockingState {
   // URL actions
   addIncludedUrl: (url: string) => void;
   removeIncludedUrl: (url: string) => void;
+  toggleIncludedUrl: (url: string) => void;
   addExcludedUrl: (url: string) => void;
   removeExcludedUrl: (url: string) => void;
+  toggleExcludedUrl: (url: string) => void;
+  setSiteControlMode: (mode: ControlMode) => void;
+  setSiteSurveillance: (config: SurveillanceConfig) => void;
 
   // Category actions
   toggleCategory: (id: string) => void;
@@ -44,6 +55,8 @@ export interface BlockingState {
   removeCategory: (id: string) => void;
   updateCategoryDomains: (id: string, domains: string[]) => void;
   setAdultBlockingEnabled: (enabled: boolean) => void;
+  setAdultControlMode: (mode: ControlMode) => void;
+  setAdultSurveillance: (config: SurveillanceConfig) => void;
   setCategoryDomainCount: (id: string, count: number) => void;
 
   // Source actions
@@ -99,6 +112,8 @@ export const useBlockingStore = create<BlockingState>()(
       keywords: [],
       includedUrls: [],
       excludedUrls: [],
+      siteControlMode: "flexible",
+      siteSurveillance: { type: "none", value: 0 },
       categories: [
         {
           id: "adult",
@@ -117,6 +132,8 @@ export const useBlockingStore = create<BlockingState>()(
         },
       ],
       adultBlockingEnabled: true,
+      adultControlMode: "flexible",
+      adultSurveillance: { type: "none", value: 0 },
       categoryDomainCounts: {},
       sources: DEFAULT_SOURCES,
       blockedApps: [],
@@ -143,28 +160,55 @@ export const useBlockingStore = create<BlockingState>()(
       addIncludedUrl: (url) =>
         set((state) => {
           const lower = url.trim().toLowerCase();
-          if (!lower || state.includedUrls.includes(lower)) {
+          if (!lower || state.includedUrls.some((u) => u.url === lower))
             return state;
-          }
-          return { includedUrls: [...state.includedUrls, lower] };
+          return {
+            includedUrls: [
+              ...state.includedUrls,
+              { url: lower, enabled: true },
+            ],
+          };
         }),
 
       removeIncludedUrl: (url) =>
         set((state) => ({
-          includedUrls: state.includedUrls.filter((u) => u !== url),
+          includedUrls: state.includedUrls.filter((u) => u.url !== url),
+        })),
+
+      toggleIncludedUrl: (url) =>
+        set((state) => ({
+          includedUrls: state.includedUrls.map((u) =>
+            u.url === url ? { ...u, enabled: !u.enabled } : u,
+          ),
         })),
 
       addExcludedUrl: (url) =>
         set((state) => {
           const lower = url.trim().toLowerCase();
-          if (!lower || state.excludedUrls.includes(lower)) return state;
-          return { excludedUrls: [...state.excludedUrls, lower] };
+          if (!lower || state.excludedUrls.some((u) => u.url === lower))
+            return state;
+          return {
+            excludedUrls: [
+              ...state.excludedUrls,
+              { url: lower, enabled: true },
+            ],
+          };
         }),
 
       removeExcludedUrl: (url) =>
         set((state) => ({
-          excludedUrls: state.excludedUrls.filter((u) => u !== url),
+          excludedUrls: state.excludedUrls.filter((u) => u.url !== url),
         })),
+
+      toggleExcludedUrl: (url) =>
+        set((state) => ({
+          excludedUrls: state.excludedUrls.map((u) =>
+            u.url === url ? { ...u, enabled: !u.enabled } : u,
+          ),
+        })),
+
+      setSiteControlMode: (mode) => set({ siteControlMode: mode }),
+      setSiteSurveillance: (config) => set({ siteSurveillance: config }),
 
       toggleCategory: (id) =>
         set((state) => ({
@@ -195,6 +239,9 @@ export const useBlockingStore = create<BlockingState>()(
 
       setAdultBlockingEnabled: (enabled) =>
         set({ adultBlockingEnabled: enabled }),
+
+      setAdultControlMode: (mode) => set({ adultControlMode: mode }),
+      setAdultSurveillance: (config) => set({ adultSurveillance: config }),
 
       setCategoryDomainCount: (id, count) =>
         set((state) => ({
@@ -298,8 +345,46 @@ export const useBlockingStore = create<BlockingState>()(
               ],
             });
           }
+
+          // Migrate old string[] URLs to BlockedUrl[] objects
+          if (
+            state.includedUrls.length > 0 &&
+            typeof state.includedUrls[0] === "string"
+          ) {
+            state.importSettings({
+              includedUrls: (state.includedUrls as unknown as string[]).map(
+                (url) => ({ url, enabled: true }),
+              ),
+            });
+          }
+          if (
+            state.excludedUrls.length > 0 &&
+            typeof state.excludedUrls[0] === "string"
+          ) {
+            state.importSettings({
+              excludedUrls: (state.excludedUrls as unknown as string[]).map(
+                (url) => ({ url, enabled: true }),
+              ),
+            });
+          }
         }
       },
     },
   ),
 );
+
+/** Helper: get only enabled included URLs as string[] for native sync */
+export function getActiveIncludedUrls(): string[] {
+  return useBlockingStore
+    .getState()
+    .includedUrls.filter((u) => u.enabled)
+    .map((u) => u.url);
+}
+
+/** Helper: get only enabled excluded URLs as string[] for native sync */
+export function getActiveExcludedUrls(): string[] {
+  return useBlockingStore
+    .getState()
+    .excludedUrls.filter((u) => u.enabled)
+    .map((u) => u.url);
+}

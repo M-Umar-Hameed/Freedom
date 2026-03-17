@@ -3,9 +3,11 @@ import { BlocklistService } from "@/services/BlocklistService";
 import { ProtectionService } from "@/services/ProtectionService";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
+import type { ControlMode, SurveillanceConfig } from "@/types/blocking";
+import { getEffectiveMode, getEffectiveSurveillance } from "@/types/blocking";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,13 +19,55 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const CONTROL_MODES: {
+  id: ControlMode;
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+}[] = [
+  {
+    id: "flexible",
+    title: "Flexible",
+    description: "No friction to toggle adult blocking off.",
+    icon: "happy-outline",
+    color: "#10B981",
+  },
+  {
+    id: "locked",
+    title: "Locked",
+    description: "Requires friction to disable adult blocking.",
+    icon: "shield-outline",
+    color: "#F59E0B",
+  },
+  {
+    id: "hardcore",
+    title: "Hardcore",
+    description: "Maximum protection. Extremely difficult to disable.",
+    icon: "flame-outline",
+    color: "#EF4444",
+  },
+];
+
 export default function BlockAdultScreen(): ReactNode {
   const {
     adultBlockingEnabled,
     setAdultBlockingEnabled,
+    adultControlMode,
+    setAdultControlMode,
+    adultSurveillance,
+    setAdultSurveillance,
     categoryDomainCounts,
   } = useBlockingStore();
   const { controlMode, surveillance } = useAppStore();
+
+  const effectiveMode = getEffectiveMode(controlMode, adultControlMode);
+  const effectiveSurveillance = getEffectiveSurveillance(
+    controlMode,
+    surveillance,
+    adultControlMode,
+    adultSurveillance,
+  );
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -33,14 +77,19 @@ export default function BlockAdultScreen(): ReactNode {
     name: "",
   });
   const [guardVisible, setGuardVisible] = useState(false);
+  const [showModeModal, setShowModeModal] = useState(false);
 
-  // Themed alert modal state
   const [alertModal, setAlertModal] = useState<{
     visible: boolean;
     title: string;
     message: string;
     type: "success" | "error";
   }>({ visible: false, title: "", message: "", type: "success" });
+
+  const [pendingMode, setPendingMode] = useState<ControlMode>(adultControlMode);
+  const [pendingSurveillance, setPendingSurveillance] =
+    useState<SurveillanceConfig>(adultSurveillance);
+  const [modeGuardVisible, setModeGuardVisible] = useState(false);
 
   const showAlert = (
     title: string,
@@ -51,7 +100,7 @@ export default function BlockAdultScreen(): ReactNode {
   };
 
   const handleMasterToggle = (isEnabling: boolean): void => {
-    if (controlMode === "flexible" || isEnabling) {
+    if (effectiveMode === "flexible" || isEnabling) {
       void performToggle();
     } else {
       setGuardVisible(true);
@@ -102,10 +151,48 @@ export default function BlockAdultScreen(): ReactNode {
     }
   };
 
+  const handleSelectMode = (mode: ControlMode): void => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPendingMode(mode);
+    if (
+      (mode === "locked" || mode === "hardcore") &&
+      pendingSurveillance.type === "none"
+    ) {
+      setPendingSurveillance({ type: "timer", value: 30 });
+    }
+  };
+
+  const handleSaveMode = (): void => {
+    if (effectiveMode === "flexible") {
+      applyMode();
+    } else {
+      setShowModeModal(false);
+      setModeGuardVisible(true);
+    }
+  };
+
+  const applyMode = (): void => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setAdultControlMode(pendingMode);
+    setAdultSurveillance(pendingSurveillance);
+    setModeGuardVisible(false);
+    setShowModeModal(false);
+  };
+
+  const isModeChanged =
+    pendingMode !== adultControlMode ||
+    pendingSurveillance.type !== adultSurveillance.type ||
+    pendingSurveillance.value !== adultSurveillance.value;
+
+  const modeLabel = CONTROL_MODES.find((m) => m.id === adultControlMode);
+
   const totalDomains = Object.values(categoryDomainCounts).reduce(
     (sum, count) => sum + count,
     0,
   );
+
+  const formatHour = (h: number): string =>
+    `${h % 12 || 12}:00 ${h >= 12 ? "PM" : "AM"}`;
 
   return (
     <SafeAreaView
@@ -116,9 +203,36 @@ export default function BlockAdultScreen(): ReactNode {
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <Text className="text-2xl font-bold text-black dark:text-white mb-2">
-          Block Adult Content
-        </Text>
+        {/* Header */}
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="text-2xl font-bold text-black dark:text-white">
+            Block Adult Content
+          </Text>
+          <Pressable
+            onPress={() => {
+              setPendingMode(adultControlMode);
+              setPendingSurveillance(adultSurveillance);
+              setShowModeModal(true);
+            }}
+            className="flex-row items-center bg-gray-100 dark:bg-freedom-surface px-3 py-2 rounded-xl"
+          >
+            <Ionicons
+              name={
+                (modeLabel?.icon ?? "happy-outline") as ComponentProps<
+                  typeof Ionicons
+                >["name"]
+              }
+              size={16}
+              color={modeLabel?.color ?? "#10B981"}
+            />
+            <Text
+              className="text-xs font-bold ml-1.5"
+              style={{ color: modeLabel?.color ?? "#10B981" }}
+            >
+              {modeLabel?.title ?? "Flexible"}
+            </Text>
+          </Pressable>
+        </View>
         <Text className="text-freedom-text-muted mb-6">
           Protect yourself from adult content across all sources
         </Text>
@@ -209,7 +323,270 @@ export default function BlockAdultScreen(): ReactNode {
         <View className="h-20" />
       </ScrollView>
 
-      {/* Themed Alert Modal */}
+      {/* Control Mode Modal */}
+      <Modal visible={showModeModal} animationType="slide" transparent>
+        <View className="flex-1 bg-black/60 pt-20">
+          <View className="flex-1 bg-white dark:bg-freedom-primary rounded-t-[40px] p-6">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-xl font-bold text-black dark:text-white">
+                Adult Blocking Control
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setShowModeModal(false);
+                }}
+                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+              >
+                <Ionicons name="close" size={24} color="#94A3B8" />
+              </Pressable>
+            </View>
+            <Text className="text-freedom-text-muted text-sm mb-6">
+              Controls friction for disabling adult content blocking. Works
+              under the main control mode.
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {CONTROL_MODES.map((mode) => (
+                <Pressable
+                  key={mode.id}
+                  onPress={() => {
+                    handleSelectMode(mode.id);
+                  }}
+                  className={`p-4 rounded-2xl mb-3 border-2 ${
+                    pendingMode === mode.id
+                      ? "bg-freedom-highlight/5 border-freedom-highlight"
+                      : "bg-gray-100 dark:bg-freedom-surface border-transparent"
+                  }`}
+                >
+                  <View className="flex-row items-start">
+                    <View
+                      className="w-10 h-10 rounded-xl items-center justify-center"
+                      style={{ backgroundColor: mode.color + "20" }}
+                    >
+                      <Ionicons
+                        name={
+                          mode.icon as ComponentProps<typeof Ionicons>["name"]
+                        }
+                        size={22}
+                        color={mode.color}
+                      />
+                    </View>
+                    <View className="flex-1 ml-3">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-base font-bold text-black dark:text-white">
+                          {mode.title}
+                        </Text>
+                        {pendingMode === mode.id && (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={22}
+                            color="#2DD4BF"
+                          />
+                        )}
+                      </View>
+                      <Text className="text-freedom-text-muted text-sm mt-0.5">
+                        {mode.description}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              ))}
+
+              {/* Friction Setup */}
+              {(pendingMode === "locked" || pendingMode === "hardcore") && (
+                <View className="mt-2 mb-4">
+                  <View className="bg-gray-100 dark:bg-freedom-surface rounded-2xl p-5">
+                    <View className="flex-row gap-3 mb-6">
+                      {(["timer", "click", "time"] as const).map((type) => (
+                        <Pressable
+                          key={type}
+                          onPress={() => {
+                            void Haptics.selectionAsync();
+                            setPendingSurveillance({
+                              ...pendingSurveillance,
+                              type,
+                              ...(type === "time"
+                                ? {
+                                    startHour:
+                                      pendingSurveillance.startHour ?? 9,
+                                    endHour: pendingSurveillance.endHour ?? 21,
+                                  }
+                                : {}),
+                            });
+                          }}
+                          className={`flex-1 p-4 rounded-xl items-center border-2 ${
+                            pendingSurveillance.type === type
+                              ? "bg-freedom-highlight/10 border-freedom-highlight"
+                              : "bg-white dark:bg-freedom-primary border-transparent"
+                          }`}
+                        >
+                          <Ionicons
+                            name={
+                              (type === "timer"
+                                ? "hourglass-outline"
+                                : type === "click"
+                                  ? "finger-print-outline"
+                                  : "alarm-outline") as ComponentProps<
+                                typeof Ionicons
+                              >["name"]
+                            }
+                            size={24}
+                            color={
+                              pendingSurveillance.type === type
+                                ? "#2DD4BF"
+                                : "#94A3B8"
+                            }
+                          />
+                          <Text
+                            className={`font-bold mt-1 ${
+                              pendingSurveillance.type === type
+                                ? "text-freedom-highlight"
+                                : "text-freedom-text-muted"
+                            }`}
+                          >
+                            {type === "timer"
+                              ? "Timer"
+                              : type === "click"
+                                ? "Clicks"
+                                : "Time"}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+
+                    {pendingSurveillance.type === "time" ? (
+                      <View className="bg-white dark:bg-freedom-primary p-4 rounded-xl border border-gray-200 dark:border-freedom-secondary">
+                        {[
+                          {
+                            label: "Start",
+                            key: "startHour" as const,
+                            def: 9,
+                          },
+                          { label: "End", key: "endHour" as const, def: 21 },
+                        ].map(({ label, key, def }) => (
+                          <View
+                            key={key}
+                            className="flex-row items-center justify-between mb-2"
+                          >
+                            <Text className="text-freedom-text-muted font-bold">
+                              {label}
+                            </Text>
+                            <View className="flex-row items-center gap-4">
+                              <Pressable
+                                onPress={() => {
+                                  setPendingSurveillance({
+                                    ...pendingSurveillance,
+                                    [key]:
+                                      ((pendingSurveillance[key] ?? def) -
+                                        1 +
+                                        24) %
+                                      24,
+                                  });
+                                }}
+                                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                              >
+                                <Ionicons
+                                  name="remove"
+                                  size={20}
+                                  color="#EF4444"
+                                />
+                              </Pressable>
+                              <Text className="text-xl font-bold text-black dark:text-white w-20 text-center">
+                                {formatHour(pendingSurveillance[key] ?? def)}
+                              </Text>
+                              <Pressable
+                                onPress={() => {
+                                  setPendingSurveillance({
+                                    ...pendingSurveillance,
+                                    [key]:
+                                      ((pendingSurveillance[key] ?? def) + 1) %
+                                      24,
+                                  });
+                                }}
+                                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                              >
+                                <Ionicons
+                                  name="add"
+                                  size={20}
+                                  color="#EF4444"
+                                />
+                              </Pressable>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View className="flex-row items-center justify-between bg-white dark:bg-freedom-primary p-4 rounded-xl border border-gray-200 dark:border-freedom-secondary">
+                        <Pressable
+                          onPress={() => {
+                            const step =
+                              pendingSurveillance.type === "timer" ? 5 : 10;
+                            const min =
+                              pendingSurveillance.type === "timer" ? 5 : 10;
+                            setPendingSurveillance({
+                              ...pendingSurveillance,
+                              value: Math.max(
+                                min,
+                                pendingSurveillance.value - step,
+                              ),
+                            });
+                          }}
+                          className="w-12 h-12 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                        >
+                          <Ionicons name="remove" size={28} color="#2DD4BF" />
+                        </Pressable>
+                        <View className="items-center">
+                          <Text className="text-3xl font-bold text-black dark:text-white">
+                            {pendingSurveillance.value}
+                          </Text>
+                          <Text className="text-freedom-text-muted text-xs font-semibold uppercase">
+                            {pendingSurveillance.type === "timer"
+                              ? "Seconds"
+                              : "Taps"}
+                          </Text>
+                        </View>
+                        <Pressable
+                          onPress={() => {
+                            const step =
+                              pendingSurveillance.type === "timer" ? 5 : 10;
+                            setPendingSurveillance({
+                              ...pendingSurveillance,
+                              value: Math.min(
+                                999,
+                                pendingSurveillance.value + step,
+                              ),
+                            });
+                          }}
+                          className="w-12 h-12 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                        >
+                          <Ionicons name="add" size={28} color="#2DD4BF" />
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {isModeChanged && (
+                <Pressable
+                  onPress={handleSaveMode}
+                  className="bg-freedom-highlight p-5 rounded-2xl items-center mt-2 mb-6 border-b-4 border-freedom-accent"
+                >
+                  <Text className="text-white font-bold text-lg">
+                    {pendingMode === adultControlMode
+                      ? "Update Friction Settings"
+                      : `Activate ${pendingMode.charAt(0).toUpperCase() + pendingMode.slice(1)} Mode`}
+                  </Text>
+                </Pressable>
+              )}
+
+              <View className="h-10" />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Alert Modal */}
       <Modal visible={alertModal.visible} transparent animationType="fade">
         <View className="flex-1 bg-black/60 items-center justify-center px-6">
           <View className="bg-white dark:bg-freedom-surface w-full rounded-3xl p-6 items-center border border-freedom-highlight/20">
@@ -258,7 +635,7 @@ export default function BlockAdultScreen(): ReactNode {
           <View className="bg-white dark:bg-freedom-surface p-6 rounded-2xl w-2/3 items-center shadow-xl">
             <ActivityIndicator color="#2DD4BF" size="large" />
             <Text className="text-black dark:text-white font-bold mt-4 text-center">
-              Fetching Sources
+              Updating Sources
             </Text>
             <Text className="text-freedom-text-muted text-xs mt-1 text-center">
               {updateProgress.name}
@@ -282,12 +659,25 @@ export default function BlockAdultScreen(): ReactNode {
       <InteractionGuard
         visible={guardVisible}
         actionName="Disable Adult Content Blocking"
-        surveillanceOverride={surveillance}
+        surveillanceOverride={effectiveSurveillance}
         onSuccess={() => {
           void performToggle();
         }}
         onCancel={() => {
           setGuardVisible(false);
+        }}
+      />
+
+      {/* Guard for changing control mode */}
+      <InteractionGuard
+        visible={modeGuardVisible}
+        actionName="Change Adult Blocking Control Mode"
+        surveillanceOverride={effectiveSurveillance}
+        onSuccess={() => {
+          applyMode();
+        }}
+        onCancel={() => {
+          setModeGuardVisible(false);
         }}
       />
     </SafeAreaView>

@@ -1,4 +1,6 @@
 import { AppLockScreen } from "@/components/AppLockScreen";
+import { getLastBlocklistUpdate } from "@/db/database";
+import { BlocklistService } from "@/services/BlocklistService";
 import { ProtectionService } from "@/services/ProtectionService";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
@@ -35,6 +37,7 @@ export default function RootLayout(): ReactNode {
   const theme = useAppStore((s) => s.theme);
   const hydrateStats = useAppStore((s) => s.hydrateStats);
   const appLockEnabled = useAppStore((s) => s.appLockEnabled);
+  const controlMode = useAppStore((s) => s.controlMode);
   const systemColorScheme = useColorScheme();
   const navigationState = useRootNavigationState();
   const segments = useSegments();
@@ -121,6 +124,7 @@ export default function RootLayout(): ReactNode {
     excludedUrls,
     adultBlockingEnabled,
     blockedApps,
+    controlMode,
     isMounted,
   ]);
 
@@ -158,6 +162,18 @@ export default function RootLayout(): ReactNode {
       });
     };
   }, [isMounted, navigationState?.key]);
+
+  // Auto-update blocklists if stale (>24h since last update).
+  // The SQLite cache makes this near-instant when nothing changed upstream.
+  useEffect(() => {
+    if (!isMounted) return;
+    if (!useBlockingStore.getState().adultBlockingEnabled) return;
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    const lastUpdate = getLastBlocklistUpdate();
+    if (Date.now() - lastUpdate > TWENTY_FOUR_HOURS) {
+      void BlocklistService.updateBlocklists().catch(console.error);
+    }
+  }, [isMounted]);
 
   // Wait for both mounting and fonts to be ready for a smooth experience
   if (!isMounted || !fontsLoaded) return null;

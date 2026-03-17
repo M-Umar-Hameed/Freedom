@@ -160,7 +160,7 @@ export default function SettingsScreen(): ReactNode {
         adultBlockingEnabled,
         sources,
         exportedAt: new Date().toISOString(),
-        version: "1.3.0",
+        version: "1.4.0",
       };
 
       const docDir = FileSystem.documentDirectory;
@@ -466,7 +466,7 @@ export default function SettingsScreen(): ReactNode {
           <View className="p-4 border-b border-gray-200 dark:border-freedom-secondary">
             <Text className="text-black dark:text-white">Version</Text>
             <Text className="text-freedom-text-muted text-sm">
-              1.3.0 (Touka_Debo)
+              1.4.0 (Touka_Debo)
             </Text>
           </View>
           <Pressable

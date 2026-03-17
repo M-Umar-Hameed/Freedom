@@ -31,7 +31,38 @@ export interface ProtectionStatus {
   foregroundService: boolean;
 }
 
+export interface BlockedUrl {
+  url: string;
+  enabled: boolean;
+}
+
 export type ControlMode = "flexible" | "locked" | "hardcore";
+
+/**
+ * Get the stricter of two control modes.
+ * Main gates the app globally, sub adds per-screen friction.
+ */
+export function getEffectiveMode(
+  main: ControlMode,
+  sub: ControlMode,
+): ControlMode {
+  const order: Record<ControlMode, number> = {
+    flexible: 0,
+    locked: 1,
+    hardcore: 2,
+  };
+  return order[sub] >= order[main] ? sub : main;
+}
+
+export function getEffectiveSurveillance(
+  mainMode: ControlMode,
+  mainSurv: SurveillanceConfig,
+  subMode: ControlMode,
+  subSurv: SurveillanceConfig,
+): SurveillanceConfig {
+  const effective = getEffectiveMode(mainMode, subMode);
+  return effective === subMode && subMode !== "flexible" ? subSurv : mainSurv;
+}
 
 export interface ScheduleEntry {
   id: string;
