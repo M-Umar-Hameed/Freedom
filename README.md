@@ -1,12 +1,12 @@
-# Freedom
+# LibreAscent
 
 **Take back control of your digital life.**
 
-Freedom is a powerful, open-source Android application designed to help you break free from digital addictions. It provides a multi-layered defense system to block adult content, distracting apps, and other harmful distractors at the system level.
+LibreAscent is a powerful, open-source Android application designed to help you break free from digital addictions. It provides a multi-layered defense system to block adult content, distracting apps, and other harmful distractors at the system level.
 
 ## Multi-Layered Protection
 
-Freedom doesn't just block URLs; it secures your device across multiple layers to ensure you stay focused:
+LibreAscent doesn't just block URLs; it secures your device across multiple layers to ensure you stay focused:
 
 1. **DNS-Level Blocking (VPN):** A local DNS-intercepting VPN that returns NXDOMAIN for known adult and distraction domains. Zero battery impact for non-DNS traffic.
 2. **URL-Level Blocking (Accessibility):** Real-time monitoring of browser address bars to catch adult content in URL paths and query strings that DNS might miss.
@@ -33,7 +33,7 @@ Freedom doesn't just block URLs; it secures your device across multiple layers t
 ## Architecture
 
 ```
-Freedom/
+LibreAscent/
   app/                    # Expo Router screens (Dashboard, Keywords, Sites, Apps, Settings, etc.)
   components/             # UI components (Atomic design)
   modules/                # 5 Custom Expo Native Modules (Kotlin)
@@ -86,8 +86,8 @@ JS -> Native:       Expo Module function calls (config, start/stop)
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/M-Umar-Hameed/Freedom.git
-   cd Freedom
+   git clone https://github.com/M-Umar-Hameed/LibreAscent.git
+   cd LibreAscent
    ```
 
 2. Install dependencies:

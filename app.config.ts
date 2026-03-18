@@ -2,19 +2,19 @@ import { ConfigContext, ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Freedom",
-  slug: "freedom",
+  name: "LibreAscent",
+  slug: "libreascent",
   version: "1.4.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: "freedom",
+  scheme: "libreascent",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
   },
   android: {
-    package: "com.freedom.app",
+    package: "com.libreascent.app",
     adaptiveIcon: {
       backgroundColor: "#0B1215",
       foregroundImage: "./assets/images/android-icon-foreground.png",

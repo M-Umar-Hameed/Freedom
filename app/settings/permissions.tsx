@@ -145,7 +145,7 @@ export default function PermissionsScreen(): ReactNode {
 
       <ScrollView className="flex-1 px-4 pt-4">
         <Text className="text-freedom-text-muted mb-6">
-          Manage the core permissions required for Freedom to provide full
+          Manage the core permissions required for LibreAscent to provide full
           protection.
         </Text>
 

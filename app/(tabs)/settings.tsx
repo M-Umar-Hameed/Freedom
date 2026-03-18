@@ -164,7 +164,7 @@ export default function SettingsScreen(): ReactNode {
       };
 
       const docDir = FileSystem.documentDirectory;
-      const fileUri = `${docDir}freedom_settings.json`;
+      const fileUri = `${docDir}libreascent_settings.json`;
       await FileSystem.writeAsStringAsync(
         fileUri,
         JSON.stringify(settings, null, 2),
@@ -213,14 +213,14 @@ export default function SettingsScreen(): ReactNode {
       console.error("[Settings] Import failed:", e);
       Alert.alert(
         "Error",
-        "Failed to import settings. Ensure the file is a valid Freedom settings JSON.",
+        "Failed to import settings. Ensure the file is a valid LibreAscent settings JSON.",
       );
     }
   };
 
   const openRepo = (): void => {
     void Haptics.selectionAsync();
-    void Linking.openURL("https://github.com/M-Umar-Hameed/Freedom");
+    void Linking.openURL("https://github.com/M-Umar-Hameed/LibreAscent");
   };
 
   return (
@@ -482,7 +482,7 @@ export default function SettingsScreen(): ReactNode {
             onPress={() => {
               void Haptics.selectionAsync();
               void Linking.openURL(
-                "https://github.com/M-Umar-Hameed/Freedom/issues",
+                "https://github.com/M-Umar-Hameed/LibreAscent/issues",
               );
             }}
             className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-freedom-secondary"
@@ -496,7 +496,7 @@ export default function SettingsScreen(): ReactNode {
             onPress={() => {
               void Haptics.selectionAsync();
               void Linking.openURL(
-                "https://github.com/M-Umar-Hameed/Freedom/blob/main/LICENSE",
+                "https://github.com/M-Umar-Hameed/LibreAscent/blob/main/LICENSE",
               );
             }}
             className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4"

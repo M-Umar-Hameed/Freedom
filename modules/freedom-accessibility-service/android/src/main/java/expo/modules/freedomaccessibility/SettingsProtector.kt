@@ -45,9 +45,9 @@ class SettingsProtector {
         )
 
         private val ACCESSIBILITY_TRIGGERS = listOf(
-            "stop freedom",
-            "turn off freedom",
-            "use freedom",
+            "stop libreascent",
+            "turn off libreascent",
+            "use libreascent",
             "shortcut",
             "off"
         )
@@ -173,11 +173,11 @@ class SettingsProtector {
     }
 
     private fun containsFreedom(texts: List<String>): Boolean {
-        if (texts.any { it == "com.freedom.app" || it == "com.toukadebo.freedom" || it == myPackageName }) return true
+        if (texts.any { it == "com.libreascent.app" || it == myPackageName }) return true
 
         return texts.any { text ->
             val words = text.trim().split(Regex("\\s+"))
-            words.any { it.equals("Freedom", ignoreCase = true) }
+            words.any { it.equals("LibreAscent", ignoreCase = true) }
         }
     }
 

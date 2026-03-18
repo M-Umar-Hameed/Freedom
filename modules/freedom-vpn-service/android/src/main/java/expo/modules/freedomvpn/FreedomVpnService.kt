@@ -118,7 +118,7 @@ class FreedomVpnService : VpnService() {
     private fun establishVpn(): Boolean {
         return try {
             val builder = Builder()
-                .setSession("Freedom")
+                .setSession("LibreAscent")
                 .setMtu(MTU)
                 // Assign a private IP to the TUN interface
                 .addAddress("10.0.0.2", 32)
@@ -464,10 +464,10 @@ class FreedomVpnService : VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Freedom VPN",
+                "LibreAscent VPN",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows when Freedom VPN is filtering DNS traffic"
+                description = "Shows when LibreAscent VPN is filtering DNS traffic"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
@@ -477,7 +477,7 @@ class FreedomVpnService : VpnService() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Freedom is protecting you")
+            .setContentTitle("LibreAscent is protecting you")
             .setContentText("DNS filtering active — ${blocklist.size()} domains blocked")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)

@@ -72,14 +72,14 @@ export default function WelcomeScreen(): ReactNode {
 
         {/* Title */}
         <Text className="text-4xl font-bold text-white text-center mb-3">
-          Freedom
+          LibreAscent
         </Text>
         <Text className="text-lg text-freedom-highlight text-center mb-2 font-medium">
           Break free from addiction
         </Text>
         <Text className="text-freedom-text-muted text-center mb-10 leading-6">
-          Freedom protects you by blocking harmful content across all browsers
-          and apps on your device.
+          LibreAscent protects you by blocking harmful content across all
+          browsers and apps on your device.
         </Text>
 
         {/* Features */}

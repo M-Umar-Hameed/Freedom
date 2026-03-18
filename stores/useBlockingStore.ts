@@ -93,14 +93,14 @@ export const DEFAULT_SOURCES: BlocklistSource[] = [
   {
     id: "porn-blocklist",
     name: "Porn Blocklist",
-    url: "https://raw.githubusercontent.com/M-Umar-Hameed/Freedom/main/assets/blocklistsource/porn-blocklist.txt",
+    url: "https://raw.githubusercontent.com/M-Umar-Hameed/LibreAscent/main/assets/blocklistsource/porn-blocklist.txt",
     format: "domains",
     enabled: true,
   },
   {
     id: "hentai-blocklist",
     name: "Hentai Blocklist",
-    url: "https://raw.githubusercontent.com/M-Umar-Hameed/Freedom/main/assets/blocklistsource/hentai-blocklist.txt",
+    url: "https://raw.githubusercontent.com/M-Umar-Hameed/LibreAscent/main/assets/blocklistsource/hentai-blocklist.txt",
     format: "domains",
     enabled: true,
   },

@@ -12,7 +12,7 @@ export default function TabLayout(): ReactNode {
         headerShown: false,
         tabBarActiveTintColor: "#2DD4BF",
         tabBarInactiveTintColor: "#94A3B8",
-        freezeOnBlur: true,
+        freezeOnBlur: false,
         tabBarStyle: {
           backgroundColor: "#0B1215",
           borderTopColor: "#1A2421",
@@ -32,8 +32,8 @@ export default function TabLayout(): ReactNode {
           <Pressable
             {...props}
             onPress={(e) => {
-              void Haptics.selectionAsync();
               props.onPress?.(e);
+              void Haptics.selectionAsync();
             }}
           />
         ),

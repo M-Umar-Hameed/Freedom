@@ -20,7 +20,7 @@ export function AppLockScreen({
 
   const attemptBiometric = useCallback(async (): Promise<void> => {
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: "Unlock Freedom",
+      promptMessage: "Unlock LibreAscent",
       fallbackLabel: "Use password",
       disableDeviceFallback: true,
     });
@@ -63,7 +63,7 @@ export function AppLockScreen({
           <Ionicons name="lock-closed" size={40} color="#2DD4BF" />
         </View>
         <Text className="text-white text-2xl font-bold mb-2">
-          Freedom is Locked
+          LibreAscent is Locked
         </Text>
         <Text className="text-freedom-text-muted text-center mb-8">
           {appLockType === "passkey"

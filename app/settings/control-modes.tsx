@@ -436,9 +436,9 @@ export default function ControlModesScreen(): ReactNode {
           </View>
           <Text className="text-blue-800 dark:text-blue-300 text-sm leading-5">
             Hardcore mode uses the Accessibility Service to monitor specific
-            System Settings. If you try to uninstall Freedom or deactivate its
-            Admin access, the app will automatically bounce you back to protect
-            your focus.
+            System Settings. If you try to uninstall LibreAscent or deactivate
+            its Admin access, the app will automatically bounce you back to
+            protect your focus.
           </Text>
         </View>
 

@@ -201,7 +201,7 @@ export default function PermissionsScreen(): ReactNode {
             Setup Permissions
           </Text>
           <Text className="text-freedom-text-muted text-base leading-6">
-            Freedom needs these permissions to protect you. Tap each one to
+            LibreAscent needs these permissions to protect you. Tap each one to
             grant access.
           </Text>
         </View>
@@ -232,8 +232,8 @@ export default function PermissionsScreen(): ReactNode {
             style={{ marginTop: 2 }}
           />
           <Text className="text-freedom-text-muted ml-3 flex-1 text-sm leading-5">
-            All data stays on your device. Freedom does not collect, transmit,
-            or store any browsing data. The app is fully open source.
+            All data stays on your device. LibreAscent does not collect,
+            transmit, or store any browsing data. The app is fully open source.
           </Text>
         </View>
 

@@ -37,7 +37,7 @@ export default function DashboardScreen(): ReactNode {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <Text className="text-3xl font-bold text-black dark:text-white text-center mb-2 tracking-tighter leading-tight">
-          Freedom
+          LibreAscent
         </Text>
         <Text className="text-freedom-text-muted-bright text-center mb-10 tracking-tight max-w-[280px] self-center">
           Your shield against addiction

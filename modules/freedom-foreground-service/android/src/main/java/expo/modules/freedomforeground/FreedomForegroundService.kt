@@ -19,7 +19,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
  * Freedom Foreground Service — Keeps the app alive via persistent notification.
  *
  * Features:
- * - Persistent "Freedom is protecting you" notification
+ * - Persistent "LibreAscent is protecting you" notification
  * - Dynamic notification text updates (blocked count)
  * - Tapping notification opens the app
  * - Listens for domain blocked events to update counter
@@ -73,7 +73,7 @@ class FreedomForegroundService : Service() {
      */
     private fun updateNotification(title: String?, text: String?) {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title ?: "Freedom is protecting you")
+            .setContentTitle(title ?: "LibreAscent is protecting you")
             .setContentText(text ?: "Content blocking is active • $blockedCount blocked")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
@@ -87,7 +87,7 @@ class FreedomForegroundService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Freedom is protecting you")
+            .setContentTitle("LibreAscent is protecting you")
             .setContentText("Content blocking is active")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
@@ -117,10 +117,10 @@ class FreedomForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Freedom Protection",
+                "LibreAscent Protection",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows when Freedom is actively protecting you"
+                description = "Shows when LibreAscent is actively protecting you"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)

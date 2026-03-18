@@ -17,7 +17,7 @@ export default function BlockOverlayScreen(): ReactNode {
           Stay Away
         </Text>
         <Text className="text-lg text-freedom-text-muted text-center mb-8">
-          This content has been blocked by Freedom
+          This content has been blocked by LibreAscent
         </Text>
 
         {/* Motivational Message */}

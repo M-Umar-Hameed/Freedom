@@ -44,7 +44,8 @@ export const PERMISSIONS: PermissionConfig[] = [
     icon: "eye",
     required: true,
     grantType: "settings-page",
-    settingsHint: "Find 'Freedom' in Settings > Accessibility and turn it on",
+    settingsHint:
+      "Find 'LibreAscent' in Settings > Accessibility and turn it on",
   },
   {
     id: "overlay",
@@ -54,7 +55,8 @@ export const PERMISSIONS: PermissionConfig[] = [
     icon: "layers",
     required: true,
     grantType: "settings-page",
-    settingsHint: "Find 'Freedom' and toggle 'Allow display over other apps'",
+    settingsHint:
+      "Find 'LibreAscent' and toggle 'Allow display over other apps'",
   },
   {
     id: "deviceAdmin",
