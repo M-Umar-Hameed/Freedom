@@ -1,3 +1,4 @@
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { ProtectionService } from "@/services/ProtectionService";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
@@ -7,6 +8,7 @@ import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DashboardScreen(): ReactNode {
+  const t = useAppTheme();
   const stats = useAppStore((state) => state.stats);
   const { controlMode, schedule } = useAppStore();
   const keywordsCount = useBlockingStore((state) => state.keywords.length);
@@ -18,36 +20,61 @@ export default function DashboardScreen(): ReactNode {
   const hasSchedule = schedule.length > 0;
 
   const modeInfo = {
-    flexible: { label: "Flexible", color: "#2DD4BF", icon: "leaf" as const },
-    locked: { label: "Locked", color: "#F59E0B", icon: "lock-closed" as const },
+    flexible: {
+      label: "Flexible",
+      color: t.accentColor,
+      icon: "leaf" as const,
+    },
+    locked: {
+      label: "Locked",
+      color: t.warningColor,
+      icon: "lock-closed" as const,
+    },
     hardcore: {
       label: "Hardcore",
-      color: "#EF4444",
+      color: t.dangerColor,
       icon: "shield-sharp" as const,
     },
   }[controlMode];
 
+  const cardStyle = {
+    backgroundColor: t.accentColor + "0D",
+    borderWidth: 1,
+    borderColor: t.accentColor + "20",
+  };
+
   return (
     <SafeAreaView
-      className="flex-1 bg-white dark:bg-freedom-primary"
+      className="flex-1"
+      style={{ backgroundColor: t.bgColor }}
       edges={["top"]}
     >
       <ScrollView
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <Text className="text-3xl font-bold text-black dark:text-white text-center mb-2 tracking-tighter leading-tight">
+        <Text
+          className="text-3xl font-bold text-center mb-2 tracking-tighter leading-tight"
+          style={{ color: t.textColor }}
+        >
           LibreAscent
         </Text>
-        <Text className="text-freedom-text-muted-bright text-center mb-10 tracking-tight max-w-[280px] self-center">
+        <Text
+          className="text-center mb-10 tracking-tight max-w-[280px] self-center"
+          style={{ color: t.mutedTextColor }}
+        >
           Your shield against addiction
         </Text>
 
         {/* Protection Status */}
-        <View className="bg-freedom-secondary/30 dark:bg-freedom-surface border border-freedom-accent/10 rounded-3xl p-6 items-center mb-6 shadow-lg shadow-freedom-accent/20">
+        <View className="rounded-3xl p-6 items-center mb-6" style={cardStyle}>
           <View
-            className="w-24 h-24 rounded-full items-center justify-center mb-4 border border-freedom-accent/20 shadow-md shadow-freedom-accent/30"
-            style={{ backgroundColor: modeInfo.color + "15" }}
+            className="w-24 h-24 rounded-full items-center justify-center mb-4"
+            style={{
+              backgroundColor: modeInfo.color + "15",
+              borderWidth: 1,
+              borderColor: t.accentColor + "20",
+            }}
           >
             <Ionicons
               name={modeInfo.icon as ComponentProps<typeof Ionicons>["name"]}
@@ -57,21 +84,27 @@ export default function DashboardScreen(): ReactNode {
           </View>
           <Text
             className="text-2xl font-black text-center tracking-tighter leading-tight"
-            style={{ color: isScheduled ? "#2DD4BF" : "#94A3B8" }}
+            style={{ color: isScheduled ? t.accentColor : t.mutedTextColor }}
           >
             {isScheduled ? "Protection Active" : "Protection Paused"}
           </Text>
-          <View className="flex-row items-center mt-3 bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full">
+          <View
+            className="flex-row items-center mt-3 px-3 py-1 rounded-full"
+            style={{ backgroundColor: t.bgColor + "80" }}
+          >
             <View
               className="w-2 h-2 rounded-full mr-2"
               style={{ backgroundColor: modeInfo.color }}
             />
-            <Text className="text-freedom-text-muted text-[10px] font-bold uppercase tracking-widest">
+            <Text
+              className="text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: t.mutedTextColor }}
+            >
               {modeInfo.label} Mode
             </Text>
           </View>
           {hasSchedule && (
-            <Text className="text-freedom-text-muted mt-2 text-xs">
+            <Text className="mt-2 text-xs" style={{ color: t.mutedTextColor }}>
               {isScheduled ? "Within scheduled time" : "Outside scheduled time"}
             </Text>
           )}
@@ -81,53 +114,69 @@ export default function DashboardScreen(): ReactNode {
         <View className="flex-row gap-3 mb-6">
           <View
             aria-label="Days clean"
-            className="flex-1 bg-gray-100 dark:bg-freedom-surface rounded-2xl p-4 shadow-sm"
+            className="flex-1 rounded-2xl p-4"
+            style={{ backgroundColor: t.cardBgColor }}
           >
-            <Text className="text-freedom-text-muted text-xs font-semibold uppercase tracking-wider mb-1">
+            <Text
+              className="text-xs font-semibold uppercase tracking-wider mb-1"
+              style={{ color: t.mutedTextColor }}
+            >
               Days Clean
             </Text>
-            <Text className="text-3xl font-bold text-black dark:text-white">
+            <Text className="text-3xl font-bold" style={{ color: t.textColor }}>
               {stats.daysClean}
             </Text>
           </View>
           <View
             aria-label="Blocked today"
-            className="flex-1 bg-gray-100 dark:bg-freedom-surface rounded-2xl p-4 shadow-sm"
+            className="flex-1 rounded-2xl p-4"
+            style={{ backgroundColor: t.cardBgColor }}
           >
-            <Text className="text-freedom-text-muted text-xs font-semibold uppercase tracking-wider mb-1">
+            <Text
+              className="text-xs font-semibold uppercase tracking-wider mb-1"
+              style={{ color: t.mutedTextColor }}
+            >
               Today
             </Text>
-            <Text className="text-3xl font-bold text-black dark:text-white">
+            <Text className="text-3xl font-bold" style={{ color: t.textColor }}>
               {stats.blockedToday}
             </Text>
           </View>
           <View
             aria-label="Total blocked"
-            className="flex-1 bg-gray-100 dark:bg-freedom-surface rounded-2xl p-4 shadow-sm"
+            className="flex-1 rounded-2xl p-4"
+            style={{ backgroundColor: t.cardBgColor }}
           >
-            <Text className="text-freedom-text-muted text-xs font-semibold uppercase tracking-wider mb-1">
+            <Text
+              className="text-xs font-semibold uppercase tracking-wider mb-1"
+              style={{ color: t.mutedTextColor }}
+            >
               Total
             </Text>
-            <Text className="text-3xl font-bold text-black dark:text-white">
+            <Text className="text-3xl font-bold" style={{ color: t.textColor }}>
               {stats.totalBlocked}
             </Text>
           </View>
         </View>
 
         {/* Quick Stats */}
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl p-4 mb-6">
-          <Text className="text-lg font-semibold text-black dark:text-white mb-3">
+        <View
+          className="rounded-xl p-4 mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
+          <Text
+            className="text-lg font-semibold mb-3"
+            style={{ color: t.textColor }}
+          >
             Protection Summary
           </Text>
           <View className="flex-row justify-between mb-2">
-            <Text className="text-freedom-text-muted">Keywords Active</Text>
-            <Text className="text-black dark:text-white">{keywordsCount}</Text>
+            <Text style={{ color: t.mutedTextColor }}>Keywords Active</Text>
+            <Text style={{ color: t.textColor }}>{keywordsCount}</Text>
           </View>
           <View className="flex-row justify-between mb-2">
-            <Text className="text-freedom-text-muted">Domains Blocked</Text>
-            <Text className="text-black dark:text-white">
-              {domainsBlockedCount}
-            </Text>
+            <Text style={{ color: t.mutedTextColor }}>Domains Blocked</Text>
+            <Text style={{ color: t.textColor }}>{domainsBlockedCount}</Text>
           </View>
         </View>
       </ScrollView>

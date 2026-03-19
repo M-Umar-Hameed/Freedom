@@ -4,7 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "LibreAscent",
   slug: "libreascent",
-  version: "1.4.0",
+  version: "1.5.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "libreascent",
@@ -60,6 +60,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     "expo-font",
     "expo-sqlite",
+    "./plugins/withAndroidPackageFix",
+    "./plugins/withJvmTarget17",
+    "./plugins/withArm64Only",
   ],
   experiments: {
     typedRoutes: true,

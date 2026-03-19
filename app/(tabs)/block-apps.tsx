@@ -1,5 +1,6 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
 import * as FreedomAccessibility from "@/modules/freedom-accessibility-service/src";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
 import type { BlockedApp } from "@/types/blocking";
@@ -24,7 +25,112 @@ interface AppInfo {
   packageName: string;
 }
 
+function TimePickerBar({
+  label,
+  value,
+  onChange,
+  t,
+}: {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  t: ReturnType<typeof useAppTheme>;
+}): React.JSX.Element {
+  const [h = "00", m = "00"] = (value || "00:00").split(":");
+  const hours = Array.from({ length: 24 }, (_, i) =>
+    i.toString().padStart(2, "0"),
+  );
+  const minutes = [
+    "00",
+    "05",
+    "10",
+    "15",
+    "20",
+    "25",
+    "30",
+    "35",
+    "40",
+    "45",
+    "50",
+    "55",
+  ];
+
+  return (
+    <View
+      className="mb-4 rounded-xl p-3"
+      style={{
+        backgroundColor: t.cardBgColor,
+        borderWidth: 1,
+        borderColor: t.mutedTextColor + "33",
+      }}
+    >
+      <View className="flex-row justify-between items-center mb-3 px-1">
+        <Text
+          className="text-xs uppercase font-bold"
+          style={{ color: t.mutedTextColor }}
+        >
+          {label}
+        </Text>
+        <Text className="font-black text-xl" style={{ color: t.textColor }}>
+          {h}:{m}
+        </Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mb-3"
+      >
+        {hours.map((hour) => (
+          <Pressable
+            key={`h-${hour}`}
+            onPress={() => {
+              onChange(`${hour}:${m}`);
+            }}
+            className="w-10 h-10 rounded-full items-center justify-center mr-2 border"
+            style={{
+              backgroundColor: h === hour ? t.accentColor : "transparent",
+              borderColor: h === hour ? t.accentColor : t.mutedTextColor + "33",
+            }}
+          >
+            <Text
+              className="font-bold"
+              style={{ color: h === hour ? t.bgColor : t.textColor }}
+            >
+              {hour}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {minutes.map((min) => (
+          <Pressable
+            key={`m-${min}`}
+            onPress={() => {
+              onChange(`${h}:${min}`);
+            }}
+            className="w-12 h-8 rounded-lg items-center justify-center mr-2 border"
+            style={{
+              backgroundColor: m === min ? t.accentColor : "transparent",
+              borderColor: m === min ? t.accentColor : t.mutedTextColor + "33",
+            }}
+          >
+            <Text
+              className="font-bold"
+              style={{ color: m === min ? t.bgColor : t.textColor }}
+            >
+              {min}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function BlockAppsScreen(): React.JSX.Element {
+  const t = useAppTheme();
   const {
     blockedApps,
     addBlockedApp,
@@ -118,11 +224,20 @@ export default function BlockAppsScreen(): React.JSX.Element {
   );
 
   const renderAppItem = ({ item }: { item: BlockedApp }): React.JSX.Element => (
-    <View className="bg-freedom-surface rounded-2xl p-4 mb-3 border border-freedom-highlight/10">
+    <View
+      className="rounded-2xl p-4 mb-3"
+      style={{
+        backgroundColor: t.cardBgColor,
+        borderWidth: 1,
+        borderColor: t.accentColor + "1A",
+      }}
+    >
       <View className="flex-row items-center justify-between">
         <View className="flex-1">
-          <Text className="text-white font-bold text-lg">{item.appName}</Text>
-          <Text className="text-freedom-text-muted text-xs">
+          <Text className="font-bold text-lg" style={{ color: t.textColor }}>
+            {item.appName}
+          </Text>
+          <Text className="text-xs" style={{ color: t.mutedTextColor }}>
             {item.packageName}
           </Text>
         </View>
@@ -131,17 +246,23 @@ export default function BlockAppsScreen(): React.JSX.Element {
             onPress={() => {
               setEditingApp(item);
             }}
-            className="w-10 h-10 rounded-full bg-white/5 items-center justify-center"
+            className="w-10 h-10 rounded-full items-center justify-center"
+            style={{ backgroundColor: t.mutedTextColor + "1A" }}
           >
-            <Ionicons name="settings-outline" size={20} color="#94A3B8" />
+            <Ionicons
+              name="settings-outline"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
           <Pressable
             onPress={() => {
               performActionWithGuard("toggle", item.packageName);
             }}
-            className={`w-12 h-6 rounded-full px-1 justify-center ${
-              item.enabled ? "bg-freedom-highlight" : "bg-gray-700"
-            }`}
+            className="w-12 h-6 rounded-full px-1 justify-center"
+            style={{
+              backgroundColor: item.enabled ? t.accentColor : t.cardBgColor,
+            }}
           >
             <View
               className={`w-4 h-4 rounded-full bg-white ${
@@ -153,7 +274,8 @@ export default function BlockAppsScreen(): React.JSX.Element {
             onPress={() => {
               performActionWithGuard("remove", item.packageName);
             }}
-            className="w-10 h-10 rounded-full bg-freedom-accent/10 items-center justify-center"
+            className="w-10 h-10 rounded-full items-center justify-center"
+            style={{ backgroundColor: t.dangerColor + "1A" }}
           >
             <Ionicons name="trash-outline" size={20} color="#e94560" />
           </Pressable>
@@ -161,7 +283,10 @@ export default function BlockAppsScreen(): React.JSX.Element {
       </View>
 
       {item.enabled && (
-        <View className="mt-3 pt-3 border-t border-white/5 flex-row items-center">
+        <View
+          className="mt-3 pt-3 flex-row items-center"
+          style={{ borderTopWidth: 1, borderTopColor: t.mutedTextColor + "33" }}
+        >
           <Ionicons
             name={
               item.surveillance.type === "none"
@@ -171,9 +296,12 @@ export default function BlockAppsScreen(): React.JSX.Element {
                   : "timer-outline"
             }
             size={14}
-            color="#2DD4BF"
+            color={t.accentColor}
           />
-          <Text className="text-freedom-highlight text-xs ml-1 font-medium">
+          <Text
+            className="text-xs ml-1 font-medium"
+            style={{ color: t.accentColor }}
+          >
             {item.surveillance.type === "none"
               ? "Always Blocked"
               : item.surveillance.type === "time"
@@ -186,12 +314,14 @@ export default function BlockAppsScreen(): React.JSX.Element {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-freedom-primary">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: t.bgColor }}>
       <View className="flex-1 px-6 pt-4">
         <View className="flex-row items-center justify-between mb-6">
           <View>
-            <Text className="text-3xl font-bold text-white">Blocked Apps</Text>
-            <Text className="text-freedom-text-muted">
+            <Text className="text-3xl font-bold" style={{ color: t.textColor }}>
+              Blocked Apps
+            </Text>
+            <Text style={{ color: t.mutedTextColor }}>
               Control your app usage
             </Text>
           </View>
@@ -199,7 +329,8 @@ export default function BlockAppsScreen(): React.JSX.Element {
             onPress={() => {
               setIsAddModalVisible(true);
             }}
-            className="w-12 h-12 rounded-full bg-freedom-highlight items-center justify-center shadow-lg"
+            className="w-12 h-12 rounded-full items-center justify-center shadow-lg"
+            style={{ backgroundColor: t.accentColor }}
           >
             <Ionicons name="add" size={32} color="white" />
           </Pressable>
@@ -207,8 +338,11 @@ export default function BlockAppsScreen(): React.JSX.Element {
 
         {blockedApps.length === 0 ? (
           <View className="flex-1 items-center justify-center opacity-40">
-            <Ionicons name="apps-outline" size={80} color="#94A3B8" />
-            <Text className="text-freedom-text-muted mt-4 text-center">
+            <Ionicons name="apps-outline" size={80} color={t.mutedTextColor} />
+            <Text
+              className="mt-4 text-center"
+              style={{ color: t.mutedTextColor }}
+            >
               No apps blocked yet.{"\n"}Tap the + button to add one.
             </Text>
           </View>
@@ -226,25 +360,42 @@ export default function BlockAppsScreen(): React.JSX.Element {
       {/* Add App Modal */}
       <Modal visible={isAddModalVisible} animationType="slide" transparent>
         <View className="flex-1 bg-black/60 pt-20">
-          <View className="flex-1 bg-freedom-primary rounded-t-[40px] p-6">
+          <View
+            className="flex-1 rounded-t-[40px] p-6"
+            style={{ backgroundColor: t.bgColor }}
+          >
             <View className="flex-row items-center justify-between mb-6">
-              <Text className="text-2xl font-bold text-white">Select App</Text>
+              <Text
+                className="text-2xl font-bold"
+                style={{ color: t.textColor }}
+              >
+                Select App
+              </Text>
               <Pressable
                 onPress={() => {
                   setIsAddModalVisible(false);
                 }}
-                className="w-10 h-10 rounded-full bg-white/5 items-center justify-center"
+                className="w-10 h-10 rounded-full items-center justify-center"
+                style={{ backgroundColor: t.mutedTextColor + "1A" }}
               >
-                <Ionicons name="close" size={24} color="white" />
+                <Ionicons name="close" size={24} color={t.textColor} />
               </Pressable>
             </View>
 
-            <View className="bg-freedom-surface rounded-2xl flex-row items-center px-4 mb-6 border border-freedom-highlight/10">
-              <Ionicons name="search" size={20} color="#94A3B8" />
+            <View
+              className="rounded-2xl flex-row items-center px-4 mb-6"
+              style={{
+                backgroundColor: t.cardBgColor,
+                borderWidth: 1,
+                borderColor: t.accentColor + "1A",
+              }}
+            >
+              <Ionicons name="search" size={20} color={t.mutedTextColor} />
               <TextInput
                 placeholder="Search apps..."
-                placeholderTextColor="#64748B"
-                className="flex-1 h-12 ml-2 text-white"
+                placeholderTextColor={t.mutedTextColor}
+                className="flex-1 h-12 ml-2"
+                style={{ color: t.textColor }}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
@@ -252,7 +403,7 @@ export default function BlockAppsScreen(): React.JSX.Element {
 
             {isLoadingApps ? (
               <View className="flex-1 items-center justify-center">
-                <ActivityIndicator size="large" color="#2DD4BF" />
+                <ActivityIndicator size="large" color={t.accentColor} />
               </View>
             ) : (
               <FlatList
@@ -263,14 +414,34 @@ export default function BlockAppsScreen(): React.JSX.Element {
                     onPress={() => {
                       handleAddApp(item);
                     }}
-                    className="flex-row items-center p-4 mb-2 bg-freedom-surface rounded-xl border border-white/5"
+                    className="flex-row items-center p-4 mb-2 rounded-xl"
+                    style={{
+                      backgroundColor: t.cardBgColor,
+                      borderWidth: 1,
+                      borderColor: t.mutedTextColor + "33",
+                    }}
                   >
-                    <View className="w-10 h-10 rounded-lg bg-freedom-highlight/10 items-center justify-center mr-4">
-                      <Ionicons name="cube-outline" size={24} color="#2DD4BF" />
+                    <View
+                      className="w-10 h-10 rounded-lg items-center justify-center mr-4"
+                      style={{ backgroundColor: t.accentColor + "1A" }}
+                    >
+                      <Ionicons
+                        name="cube-outline"
+                        size={24}
+                        color={t.accentColor}
+                      />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-white font-bold">{item.name}</Text>
-                      <Text className="text-freedom-text-muted text-xs">
+                      <Text
+                        className="font-bold"
+                        style={{ color: t.textColor }}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text
+                        className="text-xs"
+                        style={{ color: t.mutedTextColor }}
+                      >
                         {item.packageName}
                       </Text>
                     </View>
@@ -286,11 +457,21 @@ export default function BlockAppsScreen(): React.JSX.Element {
       {/* Edit Control Modal */}
       <Modal visible={editingApp !== null} animationType="fade" transparent>
         <View className="flex-1 bg-black/80 items-center justify-center px-6">
-          <View className="bg-freedom-surface w-full rounded-3xl p-6 border border-freedom-highlight/20">
-            <Text className="text-xl font-bold text-white mb-2">
+          <View
+            className="w-full rounded-3xl p-6"
+            style={{
+              backgroundColor: t.cardBgColor,
+              borderWidth: 1,
+              borderColor: t.accentColor + "33",
+            }}
+          >
+            <Text
+              className="text-xl font-bold mb-2"
+              style={{ color: t.textColor }}
+            >
               Control: {editingApp?.appName}
             </Text>
-            <Text className="text-freedom-text-muted mb-6">
+            <Text className="mb-6" style={{ color: t.mutedTextColor }}>
               Set a bypass method for this app
             </Text>
 
@@ -308,14 +489,24 @@ export default function BlockAppsScreen(): React.JSX.Element {
                         : null,
                     );
                   }}
-                  className={`p-4 rounded-xl mb-3 border ${
-                    editingApp?.surveillance.type === type
-                      ? "bg-freedom-highlight/20 border-freedom-highlight"
-                      : "bg-white/5 border-transparent"
-                  }`}
+                  className="p-4 rounded-xl mb-3"
+                  style={{
+                    borderWidth: 1,
+                    backgroundColor:
+                      editingApp?.surveillance.type === type
+                        ? t.accentColor + "33"
+                        : t.mutedTextColor + "1A",
+                    borderColor:
+                      editingApp?.surveillance.type === type
+                        ? t.accentColor
+                        : "transparent",
+                  }}
                 >
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-white font-bold capitalize">
+                    <Text
+                      className="font-bold capitalize"
+                      style={{ color: t.textColor }}
+                    >
                       {type === "none"
                         ? "Hard Block (No Bypass)"
                         : type === "time"
@@ -326,7 +517,7 @@ export default function BlockAppsScreen(): React.JSX.Element {
                       <Ionicons
                         name="checkmark-circle"
                         size={20}
-                        color="#2DD4BF"
+                        color={t.accentColor}
                       />
                     )}
                   </View>
@@ -336,7 +527,10 @@ export default function BlockAppsScreen(): React.JSX.Element {
               {(editingApp?.surveillance.type === "timer" ||
                 editingApp?.surveillance.type === "click") && (
                 <View className="mt-4">
-                  <Text className="text-white mb-2 font-medium">
+                  <Text
+                    className="mb-2 font-medium"
+                    style={{ color: t.textColor }}
+                  >
                     {editingApp?.surveillance.type === "timer"
                       ? "Seconds"
                       : "Click Count"}
@@ -359,11 +553,15 @@ export default function BlockAppsScreen(): React.JSX.Element {
                             : null,
                         );
                       }}
-                      className="w-12 h-12 rounded-xl bg-white/5 items-center justify-center"
+                      className="w-12 h-12 rounded-xl items-center justify-center"
+                      style={{ backgroundColor: t.mutedTextColor + "1A" }}
                     >
-                      <Ionicons name="remove" size={24} color="white" />
+                      <Ionicons name="remove" size={24} color={t.textColor} />
                     </Pressable>
-                    <Text className="text-white text-2xl font-bold">
+                    <Text
+                      className="text-2xl font-bold"
+                      style={{ color: t.textColor }}
+                    >
                       {editingApp?.surveillance.value}
                     </Text>
                     <Pressable
@@ -380,9 +578,10 @@ export default function BlockAppsScreen(): React.JSX.Element {
                             : null,
                         );
                       }}
-                      className="w-12 h-12 rounded-xl bg-white/5 items-center justify-center"
+                      className="w-12 h-12 rounded-xl items-center justify-center"
+                      style={{ backgroundColor: t.mutedTextColor + "1A" }}
                     >
-                      <Ionicons name="add" size={24} color="white" />
+                      <Ionicons name="add" size={24} color={t.textColor} />
                     </Pressable>
                   </View>
                 </View>
@@ -390,46 +589,34 @@ export default function BlockAppsScreen(): React.JSX.Element {
 
               {editingApp?.surveillance.type === "time" && (
                 <View className="mt-4">
-                  <Text className="text-freedom-text-muted mb-4 text-xs">
+                  <Text
+                    className="mb-4 text-xs"
+                    style={{ color: t.mutedTextColor }}
+                  >
                     Set specific hours when this app should be blocked.
                   </Text>
-                  <View className="flex-row gap-x-4">
-                    <View className="flex-1">
-                      <Text className="text-freedom-text-muted text-xs mb-2 uppercase font-bold">
-                        Start Time
-                      </Text>
-                      <View className="bg-white/5 rounded-xl border border-white/10 flex-row items-center px-4">
-                        <TextInput
-                          className="flex-1 h-12 text-white font-bold"
-                          placeholder="HH:mm"
-                          placeholderTextColor="#475569"
-                          value={editingApp?.startTime || ""}
-                          onChangeText={(text) => {
-                            setEditingApp((prev) =>
-                              prev ? { ...prev, startTime: text } : null,
-                            );
-                          }}
-                        />
-                      </View>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-freedom-text-muted text-xs mb-2 uppercase font-bold">
-                        End Time
-                      </Text>
-                      <View className="bg-white/5 rounded-xl border border-white/10 flex-row items-center px-4">
-                        <TextInput
-                          className="flex-1 h-12 text-white font-bold"
-                          placeholder="HH:mm"
-                          placeholderTextColor="#475569"
-                          value={editingApp?.endTime || ""}
-                          onChangeText={(text) => {
-                            setEditingApp((prev) =>
-                              prev ? { ...prev, endTime: text } : null,
-                            );
-                          }}
-                        />
-                      </View>
-                    </View>
+                  <View className="flex-col">
+                    <TimePickerBar
+                      label="Start Time"
+                      value={editingApp?.startTime || "00:00"}
+                      onChange={(text) => {
+                        setEditingApp((prev) =>
+                          prev ? { ...prev, startTime: text } : null,
+                        );
+                      }}
+                      t={t}
+                    />
+
+                    <TimePickerBar
+                      label="End Time"
+                      value={editingApp?.endTime || "00:00"}
+                      onChange={(text) => {
+                        setEditingApp((prev) =>
+                          prev ? { ...prev, endTime: text } : null,
+                        );
+                      }}
+                      t={t}
+                    />
                   </View>
                 </View>
               )}
@@ -440,9 +627,12 @@ export default function BlockAppsScreen(): React.JSX.Element {
                 onPress={() => {
                   setEditingApp(null);
                 }}
-                className="flex-1 py-4 rounded-xl items-center bg-white/5"
+                className="flex-1 py-4 rounded-xl items-center"
+                style={{ backgroundColor: t.mutedTextColor + "1A" }}
               >
-                <Text className="text-white font-bold">Cancel</Text>
+                <Text className="font-bold" style={{ color: t.textColor }}>
+                  Cancel
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -454,9 +644,12 @@ export default function BlockAppsScreen(): React.JSX.Element {
                     );
                   }
                 }}
-                className="flex-1 py-4 rounded-xl items-center bg-freedom-highlight"
+                className="flex-1 py-4 rounded-xl items-center"
+                style={{ backgroundColor: t.accentColor }}
               >
-                <Text className="text-white font-bold">Save Changes</Text>
+                <Text className="font-bold" style={{ color: t.textColor }}>
+                  Save Changes
+                </Text>
               </Pressable>
             </View>
           </View>

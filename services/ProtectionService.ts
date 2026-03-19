@@ -1,6 +1,8 @@
 import { BROWSERS } from "@/constants/browsers";
+import { getResolvedTheme } from "@/constants/overlay-themes";
 import { incrementDailyBlockedCount, logBlockedUrl } from "@/db/database";
 import * as FreedomAccessibility from "@/modules/freedom-accessibility-service/src";
+import * as FreedomOverlay from "@/modules/freedom-overlay/src";
 import * as FreedomVpn from "@/modules/freedom-vpn-service/src";
 import { BlockingCategory } from "@/types/blocking";
 import { useAppStore } from "@/stores/useAppStore";
@@ -128,13 +130,31 @@ export const ProtectionService = {
             }
 
             // 3. Sync other parts in parallel
+            const appState = useAppStore.getState();
+            const activeTheme =
+              appState.appThemeId === "custom" && appState.customTheme
+                ? {
+                    ...appState.customTheme,
+                    customImagePath: appState.overlayCustomImage ?? null,
+                  }
+                : getResolvedTheme(
+                    appState.appThemeId,
+                    appState.overlayCustomImage,
+                  );
+            const themeJson = JSON.stringify({
+              ...activeTheme,
+              ...appState.overlayTexts,
+            });
+
             await Promise.all([
               ProtectionService.syncBrowserConfigs(),
               BlocklistService.syncKeywordsToNative(),
               BlocklistService.syncAppsToNative(),
+              FreedomAccessibility.updateOverlayTheme(themeJson),
+              FreedomOverlay.updateOverlayTheme(themeJson),
             ]);
 
-            const controlMode = useAppStore.getState().controlMode;
+            const controlMode = appState.controlMode;
             await FreedomAccessibility.updateHardcoreMode(
               controlMode === "hardcore",
             );

@@ -344,6 +344,23 @@ class FreedomAccessibilityModule : Module() {
             }
         }
 
+        AsyncFunction("updateOverlayTheme") { themeJson: String, promise: Promise ->
+            try {
+                val context = appContext.reactContext
+                    ?: run {
+                        promise.resolve(null)
+                        return@AsyncFunction
+                    }
+                context.getSharedPreferences("freedom_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("overlay_theme", themeJson)
+                    .apply()
+                promise.resolve(null)
+            } catch (e: Exception) {
+                promise.reject("ERR_OVERLAY_THEME", e.message, e)
+            }
+        }
+
         AsyncFunction("updateHardcoreMode") { enabled: Boolean, promise: Promise ->
             try {
                 val context = appContext.reactContext

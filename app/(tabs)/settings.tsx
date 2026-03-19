@@ -1,4 +1,6 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
+import type { AppTheme } from "@/constants/overlay-themes";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { BlocklistService } from "@/services/BlocklistService";
 import { useAppStore } from "@/stores/useAppStore";
 import {
@@ -29,16 +31,22 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SettingsScreen(): ReactNode {
+  const t = useAppTheme();
   const {
     autoStartOnBoot,
     setAutoStart,
-    theme,
-    setTheme,
     appLockEnabled,
     setAppLockEnabled,
     setAppLockType,
     setAppLockHash,
     controlMode,
+    appThemeId,
+    customTheme,
+    overlayCustomImage,
+    overlayTexts,
+    setAppThemeId,
+    setCustomTheme,
+    setOverlayTexts,
   } = useAppStore();
   const {
     keywords,
@@ -159,8 +167,12 @@ export default function SettingsScreen(): ReactNode {
         excludedUrls,
         adultBlockingEnabled,
         sources,
+        appThemeId,
+        customTheme,
+        overlayCustomImage,
+        overlayTexts,
         exportedAt: new Date().toISOString(),
-        version: "1.4.0",
+        version: "1.5.0",
       };
 
       const docDir = FileSystem.documentDirectory;
@@ -194,7 +206,7 @@ export default function SettingsScreen(): ReactNode {
       const fileContent = await FileSystem.readAsStringAsync(
         result.assets[0].uri,
       );
-      const data = JSON.parse(fileContent) as Partial<BlockingState>;
+      const data = JSON.parse(fileContent) as Record<string, unknown>;
 
       // Basic validation
       if (!data.keywords && !data.sources) {
@@ -202,7 +214,18 @@ export default function SettingsScreen(): ReactNode {
         return;
       }
 
-      importSettings(data);
+      importSettings(data as Partial<BlockingState>);
+      if (data.appThemeId) setAppThemeId(data.appThemeId as string);
+      if (data.customTheme) setCustomTheme(data.customTheme as AppTheme);
+      if (data.overlayTexts)
+        setOverlayTexts(
+          data.overlayTexts as Partial<{
+            title: string;
+            subtitle: string;
+            heading: string;
+            body: string;
+          }>,
+        );
       Alert.alert(
         "Success",
         "Settings imported successfully. Syncing with native services...",
@@ -225,50 +248,58 @@ export default function SettingsScreen(): ReactNode {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white dark:bg-freedom-primary"
+      className="flex-1"
+      style={{ backgroundColor: t.bgColor }}
       edges={["top"]}
     >
       <ScrollView
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <Text className="text-2xl font-bold text-black dark:text-white mb-6 tracking-tight leading-tight">
+        <Text
+          className="text-2xl font-bold mb-6 tracking-tight leading-tight"
+          style={{ color: t.textColor }}
+        >
           Settings
         </Text>
 
         {/* Protection Settings */}
-        <Text className="text-sm font-semibold text-freedom-text-muted uppercase mb-3">
+        <Text
+          className="text-sm font-semibold uppercase mb-3"
+          style={{ color: t.mutedTextColor }}
+        >
           Protection
         </Text>
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl mb-6">
-          <View className="flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-freedom-secondary">
+        <View
+          className="rounded-xl mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
+          <View className="flex-row items-center justify-between p-4 border-b border-gray-800">
             <View className="flex-1">
-              <Text className="text-black dark:text-white">
-                Auto-start on Boot
-              </Text>
-              <Text className="text-freedom-text-muted text-sm">
+              <Text style={{ color: t.textColor }}>Auto-start on Boot</Text>
+              <Text className="text-sm" style={{ color: t.mutedTextColor }}>
                 Start protection when device restarts
               </Text>
             </View>
             <Switch
               value={autoStartOnBoot}
               onValueChange={handleBootToggle}
-              trackColor={{ false: "#ccc", true: "#2DD4BF" }}
+              trackColor={{ false: "#ccc", true: t.accentColor }}
               thumbColor={autoStartOnBoot ? "#fff" : "#999"}
               aria-label="Toggle auto-start on boot"
             />
           </View>
           <View className="flex-row items-center justify-between p-4">
             <View className="flex-1">
-              <Text className="text-black dark:text-white">App Lock</Text>
-              <Text className="text-freedom-text-muted text-sm">
+              <Text style={{ color: t.textColor }}>App Lock</Text>
+              <Text className="text-sm" style={{ color: t.mutedTextColor }}>
                 Require password or passkey to open the app
               </Text>
             </View>
             <Switch
               value={appLockEnabled}
               onValueChange={handleAppLockToggle}
-              trackColor={{ false: "#ccc", true: "#2DD4BF" }}
+              trackColor={{ false: "#ccc", true: t.accentColor }}
               thumbColor={appLockEnabled ? "#fff" : "#999"}
               aria-label="Toggle app lock"
             />
@@ -276,207 +307,278 @@ export default function SettingsScreen(): ReactNode {
         </View>
 
         {/* Control & Schedule */}
-        <Text className="text-sm font-semibold text-freedom-text-muted uppercase mb-3">
+        <Text
+          className="text-sm font-semibold uppercase mb-3"
+          style={{ color: t.mutedTextColor }}
+        >
           Control & Schedule
         </Text>
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl mb-6">
+        <View
+          className="rounded-xl mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
           <Pressable
             onPress={() => {
               void Haptics.selectionAsync();
               router.push("/settings/control-modes");
             }}
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-freedom-secondary"
+            className="flex-row items-center justify-between p-4 border-b border-gray-800"
           >
             <View className="flex-row items-center">
-              <Ionicons name="shield-outline" size={20} color="#2DD4BF" />
+              <Ionicons name="shield-outline" size={20} color={t.accentColor} />
               <View className="ml-3">
-                <Text className="text-black dark:text-white">
-                  Control Modes
-                </Text>
-                <Text className="text-freedom-text-muted text-xs">
+                <Text style={{ color: t.textColor }}>Control Modes</Text>
+                <Text className="text-xs" style={{ color: t.mutedTextColor }}>
                   Flexible, Locked, or Hardcore
                 </Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
           <Pressable
             onPress={() => {
               void Haptics.selectionAsync();
               router.push("/settings/schedule");
             }}
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4"
+            className="flex-row items-center justify-between p-4"
           >
             <View className="flex-row items-center">
-              <Ionicons name="alarm-outline" size={20} color="#2DD4BF" />
+              <Ionicons name="alarm-outline" size={20} color={t.accentColor} />
               <View className="ml-3">
-                <Text className="text-black dark:text-white">Schedule</Text>
-                <Text className="text-freedom-text-muted text-xs">
+                <Text style={{ color: t.textColor }}>Schedule</Text>
+                <Text className="text-xs" style={{ color: t.mutedTextColor }}>
                   Plan your protection times
                 </Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
         </View>
 
         {/* Display Settings */}
-        <Text className="text-sm font-semibold text-freedom-text-muted uppercase mb-3">
+        <Text
+          className="text-sm font-semibold uppercase mb-3"
+          style={{ color: t.mutedTextColor }}
+        >
           Display
         </Text>
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl mb-6">
-          <View className="flex-row items-center justify-between p-4">
+        <View
+          className="rounded-xl mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
+          <Pressable
+            onPress={() => {
+              void Haptics.selectionAsync();
+              router.push("/settings/overlay-theme");
+            }}
+            className="flex-row items-center justify-between p-4"
+          >
             <View className="flex-row items-center">
               <Ionicons
-                name={
-                  theme === "dark"
-                    ? "moon-outline"
-                    : theme === "light"
-                      ? "sunny-outline"
-                      : "color-palette-outline"
-                }
+                name="color-palette-outline"
                 size={20}
-                color="#2DD4BF"
+                color={t.accentColor}
               />
-              <Text className="text-black dark:text-white ml-3">Theme</Text>
+              <Text className="ml-3" style={{ color: t.textColor }}>
+                App Theme
+              </Text>
             </View>
-            <View className="flex-row gap-2">
-              <Pressable
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  setTheme("light");
-                }}
-                className={`px-3 py-1.5 rounded-lg active:opacity-70 ${theme === "light" ? "bg-freedom-accent" : "bg-gray-300 dark:bg-freedom-accent"}`}
-              >
-                <Text
-                  className={`${theme === "light" ? "text-freedom-primary" : "text-black dark:text-white"} text-xs font-semibold`}
-                >
-                  Light
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  setTheme("dark");
-                }}
-                className={`px-3 py-1.5 rounded-lg active:opacity-70 ${theme === "dark" ? "bg-freedom-accent" : "bg-gray-300 dark:bg-freedom-accent"}`}
-              >
-                <Text
-                  className={`${theme === "dark" ? "text-freedom-primary" : "text-black dark:text-white"} text-xs font-semibold`}
-                >
-                  Dark
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  setTheme("system");
-                }}
-                className={`px-3 py-1.5 rounded-lg active:opacity-70 ${theme === "system" ? "bg-freedom-accent" : "bg-gray-300 dark:bg-freedom-accent"}`}
-              >
-                <Text
-                  className={`${theme === "system" ? "text-freedom-primary" : "text-black dark:text-white"} text-xs font-semibold`}
-                >
-                  System
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
+          </Pressable>
         </View>
 
         {/* Permissions */}
-        <Text className="text-sm font-semibold text-freedom-text-muted uppercase mb-3">
+        <Text
+          className="text-sm font-semibold uppercase mb-3"
+          style={{ color: t.mutedTextColor }}
+        >
           Permissions
         </Text>
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl mb-6">
+        <View
+          className="rounded-xl mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
           <Pressable
             onPress={() => {
               void Haptics.selectionAsync();
               router.push("/settings/permissions");
             }}
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-freedom-secondary"
+            className="flex-row items-center justify-between p-4 border-b border-gray-800"
           >
             <View className="flex-row items-center">
-              <Ionicons name="finger-print-outline" size={20} color="#2DD4BF" />
-              <Text className="text-black dark:text-white ml-3">
+              <Ionicons
+                name="finger-print-outline"
+                size={20}
+                color={t.accentColor}
+              />
+              <Text className="ml-3" style={{ color: t.textColor }}>
                 Manage Permissions
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
           <Pressable
             onPress={() => {
               void Haptics.selectionAsync();
               router.push("/settings/update-sources");
             }}
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4"
+            className="flex-row items-center justify-between p-4"
           >
             <View className="flex-row items-center">
               <Ionicons
                 name="cloud-download-outline"
                 size={20}
-                color="#2DD4BF"
+                color={t.accentColor}
               />
-              <Text className="text-black dark:text-white ml-3">
+              <Text className="ml-3" style={{ color: t.textColor }}>
                 Update Sources
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
         </View>
 
         {/* Data */}
-        <Text className="text-sm font-semibold text-freedom-text-muted uppercase mb-3">
+        <Text
+          className="text-sm font-semibold uppercase mb-3"
+          style={{ color: t.mutedTextColor }}
+        >
           Data
         </Text>
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl mb-6">
+        <View
+          className="rounded-xl mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
           <Pressable
             onPress={handleExport}
             aria-label="Export Settings"
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-5 border-b border-gray-200 dark:border-freedom-secondary"
+            className="flex-row items-center justify-between p-5 border-b border-gray-800"
           >
             <View className="flex-row items-center">
-              <Ionicons name="share-outline" size={20} color="#2DD4BF" />
-              <Text className="text-black dark:text-white ml-3">
+              <Ionicons name="share-outline" size={20} color={t.accentColor} />
+              <Text className="ml-3" style={{ color: t.textColor }}>
                 Export Settings
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
           <Pressable
             onPress={handleImport}
             aria-label="Import Settings"
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-5"
+            className="flex-row items-center justify-between p-5"
           >
             <View className="flex-row items-center">
-              <Ionicons name="download-outline" size={20} color="#F59E0B" />
-              <Text className="text-black dark:text-white ml-3">
+              <Ionicons
+                name="download-outline"
+                size={20}
+                color={t.warningColor}
+              />
+              <Text className="ml-3" style={{ color: t.textColor }}>
                 Import Settings
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
+          </Pressable>
+        </View>
+
+        {/* Support */}
+        <Text
+          className="text-sm font-semibold uppercase mb-3"
+          style={{ color: t.mutedTextColor }}
+        >
+          Support
+        </Text>
+        <View
+          className="rounded-xl mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
+          <Pressable
+            onPress={() => {
+              void Haptics.selectionAsync();
+              void Linking.openURL(
+                "https://patreon.com/LibreAscent?utm_medium=unknown&utm_source=join_link&utm_campaign=creatorshare_fan&utm_content=copyLink",
+              );
+            }}
+            className="flex-row items-center justify-between p-4 border-b border-gray-800"
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="heart-outline" size={20} color={t.accentColor} />
+              <Text className="ml-3" style={{ color: t.textColor }}>
+                Patreon
+              </Text>
+            </View>
+            <Ionicons name="open" size={20} color={t.mutedTextColor} />
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              void Haptics.selectionAsync();
+              void Linking.openURL(
+                "https://ascentlibre.gumroad.com/l/LibreAscent",
+              );
+            }}
+            className="flex-row items-center justify-between p-4"
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="cart-outline" size={20} color={t.accentColor} />
+              <Text className="ml-3" style={{ color: t.textColor }}>
+                Gumroad
+              </Text>
+            </View>
+            <Ionicons name="open" size={20} color={t.mutedTextColor} />
           </Pressable>
         </View>
 
         {/* About */}
-        <Text className="text-sm font-semibold text-freedom-text-muted uppercase mb-3">
+        <Text
+          className="text-sm font-semibold uppercase mb-3"
+          style={{ color: t.mutedTextColor }}
+        >
           About
         </Text>
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl mb-6">
-          <View className="p-4 border-b border-gray-200 dark:border-freedom-secondary">
-            <Text className="text-black dark:text-white">Version</Text>
-            <Text className="text-freedom-text-muted text-sm">
-              1.4.0 (Touka_Debo)
+        <View
+          className="rounded-xl mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
+          <View className="p-4 border-b border-gray-800">
+            <Text style={{ color: t.textColor }}>Version</Text>
+            <Text className="text-sm" style={{ color: t.mutedTextColor }}>
+              1.5.0 (Touka_Debo)
             </Text>
           </View>
           <Pressable
             onPress={openRepo}
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-freedom-secondary"
+            className="flex-row items-center justify-between p-4 border-b border-gray-800"
           >
-            <Text className="text-black dark:text-white">
-              GitHub Repository
-            </Text>
-            <Ionicons name="open" size={20} color="#94A3B8" />
+            <Text style={{ color: t.textColor }}>GitHub Repository</Text>
+            <Ionicons name="open" size={20} color={t.mutedTextColor} />
           </Pressable>
           <Pressable
             onPress={() => {
@@ -485,12 +587,14 @@ export default function SettingsScreen(): ReactNode {
                 "https://github.com/M-Umar-Hameed/LibreAscent/issues",
               );
             }}
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-freedom-secondary"
+            className="flex-row items-center justify-between p-4 border-b border-gray-800"
           >
-            <Text className="text-black dark:text-white">
-              Support Resources
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Text style={{ color: t.textColor }}>Support Resources</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
           <Pressable
             onPress={() => {
@@ -499,12 +603,14 @@ export default function SettingsScreen(): ReactNode {
                 "https://github.com/M-Umar-Hameed/LibreAscent/blob/main/LICENSE",
               );
             }}
-            className="active:bg-gray-200 dark:active:bg-freedom-secondary flex-row items-center justify-between p-4"
+            className="flex-row items-center justify-between p-4"
           >
-            <Text className="text-black dark:text-white">
-              Open Source Licenses
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Text style={{ color: t.textColor }}>Open Source Licenses</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={t.mutedTextColor}
+            />
           </Pressable>
         </View>
       </ScrollView>
@@ -512,23 +618,46 @@ export default function SettingsScreen(): ReactNode {
       {/* App Lock Setup Modal */}
       <Modal visible={lockSetupVisible} animationType="fade" transparent>
         <View className="flex-1 bg-black/60 justify-center px-6">
-          <View className="bg-white dark:bg-freedom-surface rounded-3xl p-6 border border-freedom-highlight/20">
+          <View
+            className="rounded-3xl p-6"
+            style={{
+              backgroundColor: t.cardBgColor,
+              borderWidth: 1,
+              borderColor: t.accentColor + "33",
+            }}
+          >
             {lockSetupStep === "choose" ? (
               <>
                 <View className="items-center mb-6">
-                  <View className="w-16 h-16 rounded-full bg-freedom-highlight/20 items-center justify-center mb-4">
-                    <Ionicons name="lock-closed" size={32} color="#2DD4BF" />
+                  <View
+                    className="w-16 h-16 rounded-full items-center justify-center mb-4"
+                    style={{ backgroundColor: t.accentColor + "33" }}
+                  >
+                    <Ionicons
+                      name="lock-closed"
+                      size={32}
+                      color={t.accentColor}
+                    />
                   </View>
-                  <Text className="text-xl font-bold text-black dark:text-white text-center">
+                  <Text
+                    className="text-xl font-bold text-center"
+                    style={{ color: t.textColor }}
+                  >
                     Set Up App Lock
                   </Text>
-                  <Text className="text-freedom-text-muted text-center mt-2">
+                  <Text
+                    className="text-center mt-2"
+                    style={{ color: t.mutedTextColor }}
+                  >
                     Choose how you want to lock the app
                   </Text>
                 </View>
 
                 {lockSetupError ? (
-                  <Text className="text-red-500 text-center text-sm mb-4">
+                  <Text
+                    className="text-center text-sm mb-4"
+                    style={{ color: t.dangerColor }}
+                  >
                     {lockSetupError}
                   </Text>
                 ) : null}
@@ -537,16 +666,30 @@ export default function SettingsScreen(): ReactNode {
                   onPress={() => {
                     void handleChoosePasskey();
                   }}
-                  className="bg-freedom-highlight/10 border-2 border-freedom-highlight p-4 rounded-2xl flex-row items-center mb-3"
+                  className="p-4 rounded-2xl flex-row items-center mb-3"
+                  style={{
+                    backgroundColor: t.accentColor + "1A",
+                    borderWidth: 2,
+                    borderColor: t.accentColor,
+                  }}
                 >
-                  <View className="w-12 h-12 rounded-full bg-freedom-highlight items-center justify-center">
+                  <View
+                    className="w-12 h-12 rounded-full items-center justify-center"
+                    style={{ backgroundColor: t.accentColor }}
+                  >
                     <Ionicons name="finger-print" size={28} color="white" />
                   </View>
                   <View className="ml-4 flex-1">
-                    <Text className="text-black dark:text-white font-bold text-base">
+                    <Text
+                      className="font-bold text-base"
+                      style={{ color: t.textColor }}
+                    >
                       Passkey (Fingerprint)
                     </Text>
-                    <Text className="text-freedom-text-muted text-xs mt-0.5">
+                    <Text
+                      className="text-xs mt-0.5"
+                      style={{ color: t.mutedTextColor }}
+                    >
                       Quick unlock with your fingerprint
                     </Text>
                   </View>
@@ -554,16 +697,30 @@ export default function SettingsScreen(): ReactNode {
 
                 <Pressable
                   onPress={handleChoosePassword}
-                  className="bg-gray-100 dark:bg-freedom-primary border-2 border-gray-200 dark:border-freedom-secondary p-4 rounded-2xl flex-row items-center mb-6"
+                  className="p-4 rounded-2xl flex-row items-center mb-6"
+                  style={{
+                    backgroundColor: t.bgColor,
+                    borderWidth: 2,
+                    borderColor: t.cardBgColor,
+                  }}
                 >
-                  <View className="w-12 h-12 rounded-full bg-gray-300 dark:bg-freedom-accent items-center justify-center">
+                  <View
+                    className="w-12 h-12 rounded-full items-center justify-center"
+                    style={{ backgroundColor: t.accentColor }}
+                  >
                     <Ionicons name="keypad" size={28} color="white" />
                   </View>
                   <View className="ml-4 flex-1">
-                    <Text className="text-black dark:text-white font-bold text-base">
+                    <Text
+                      className="font-bold text-base"
+                      style={{ color: t.textColor }}
+                    >
                       Password
                     </Text>
-                    <Text className="text-freedom-text-muted text-xs mt-0.5">
+                    <Text
+                      className="text-xs mt-0.5"
+                      style={{ color: t.mutedTextColor }}
+                    >
                       Set a custom password
                     </Text>
                   </View>
@@ -575,7 +732,10 @@ export default function SettingsScreen(): ReactNode {
                   }}
                   className="py-3 items-center"
                 >
-                  <Text className="text-freedom-text-muted font-semibold">
+                  <Text
+                    className="font-semibold"
+                    style={{ color: t.mutedTextColor }}
+                  >
                     Cancel
                   </Text>
                 </Pressable>
@@ -583,24 +743,39 @@ export default function SettingsScreen(): ReactNode {
             ) : (
               <>
                 <View className="items-center mb-6">
-                  <View className="w-16 h-16 rounded-full bg-freedom-highlight/20 items-center justify-center mb-4">
-                    <Ionicons name="keypad" size={32} color="#2DD4BF" />
+                  <View
+                    className="w-16 h-16 rounded-full items-center justify-center mb-4"
+                    style={{ backgroundColor: t.accentColor + "33" }}
+                  >
+                    <Ionicons name="keypad" size={32} color={t.accentColor} />
                   </View>
-                  <Text className="text-xl font-bold text-black dark:text-white text-center">
+                  <Text
+                    className="text-xl font-bold text-center"
+                    style={{ color: t.textColor }}
+                  >
                     Set Password
                   </Text>
-                  <Text className="text-freedom-text-muted text-center mt-2">
+                  <Text
+                    className="text-center mt-2"
+                    style={{ color: t.mutedTextColor }}
+                  >
                     Minimum 4 characters
                   </Text>
                 </View>
 
                 {lockSetupError ? (
-                  <Text className="text-red-500 text-center text-sm mb-4">
+                  <Text
+                    className="text-center text-sm mb-4"
+                    style={{ color: t.dangerColor }}
+                  >
                     {lockSetupError}
                   </Text>
                 ) : null}
 
-                <Text className="text-freedom-text-muted text-sm mb-1">
+                <Text
+                  className="text-sm mb-1"
+                  style={{ color: t.mutedTextColor }}
+                >
                   Password
                 </Text>
                 <TextInput
@@ -610,13 +785,17 @@ export default function SettingsScreen(): ReactNode {
                     setLockSetupError("");
                   }}
                   placeholder="Enter password"
-                  placeholderTextColor="#64748B"
+                  placeholderTextColor={t.mutedTextColor}
                   secureTextEntry
                   autoFocus
-                  className="bg-gray-100 dark:bg-freedom-secondary p-3 rounded-lg text-black dark:text-white mb-4"
+                  className="p-3 rounded-lg mb-4"
+                  style={{ backgroundColor: t.bgColor, color: t.textColor }}
                 />
 
-                <Text className="text-freedom-text-muted text-sm mb-1">
+                <Text
+                  className="text-sm mb-1"
+                  style={{ color: t.mutedTextColor }}
+                >
                   Confirm Password
                 </Text>
                 <TextInput
@@ -626,9 +805,10 @@ export default function SettingsScreen(): ReactNode {
                     setLockSetupError("");
                   }}
                   placeholder="Confirm password"
-                  placeholderTextColor="#64748B"
+                  placeholderTextColor={t.mutedTextColor}
                   secureTextEntry
-                  className="bg-gray-100 dark:bg-freedom-secondary p-3 rounded-lg text-black dark:text-white mb-6"
+                  className="p-3 rounded-lg mb-6"
+                  style={{ backgroundColor: t.bgColor, color: t.textColor }}
                 />
 
                 <View className="flex-row">
@@ -639,9 +819,16 @@ export default function SettingsScreen(): ReactNode {
                       setConfirmPassword("");
                       setLockSetupError("");
                     }}
-                    className="flex-1 p-3 rounded-xl border border-gray-200 dark:border-freedom-secondary mr-2"
+                    className="flex-1 p-3 rounded-xl mr-2"
+                    style={{
+                      borderWidth: 1,
+                      borderColor: t.mutedTextColor + "40",
+                    }}
                   >
-                    <Text className="text-center text-black dark:text-white">
+                    <Text
+                      className="text-center"
+                      style={{ color: t.textColor }}
+                    >
                       Back
                     </Text>
                   </Pressable>
@@ -649,9 +836,13 @@ export default function SettingsScreen(): ReactNode {
                     onPress={() => {
                       void handlePasswordSetup();
                     }}
-                    className="flex-1 p-3 rounded-xl bg-freedom-accent"
+                    className="flex-1 p-3 rounded-xl"
+                    style={{ backgroundColor: t.accentColor }}
                   >
-                    <Text className="text-center text-freedom-primary font-bold">
+                    <Text
+                      className="text-center font-bold"
+                      style={{ color: t.bgColor }}
+                    >
                       Set Password
                     </Text>
                   </Pressable>

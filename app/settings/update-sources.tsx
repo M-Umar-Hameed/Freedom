@@ -1,4 +1,5 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { BlocklistService } from "@/services/BlocklistService";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
@@ -20,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function UpdateSourcesScreen(): React.ReactNode {
   const router = useRouter();
+  const t = useAppTheme();
   const {
     sources,
     addSource,
@@ -52,14 +54,12 @@ export default function UpdateSourcesScreen(): React.ReactNode {
     name: "",
   });
 
-  // Guard state
   const [guardVisible, setGuardVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<{
     type: "remove" | "toggle";
     id: string;
   } | null>(null);
 
-  // Themed alert modal
   const [alertModal, setAlertModal] = useState<{
     visible: boolean;
     title: string;
@@ -107,7 +107,6 @@ export default function UpdateSourcesScreen(): React.ReactNode {
   };
 
   const handleTogglePress = (id: string, isEnabling: boolean): void => {
-    // Enabling a source strengthens protection — instant
     if (effectiveMode === "flexible" || isEnabling) {
       executeAction("toggle", id);
     } else {
@@ -157,18 +156,24 @@ export default function UpdateSourcesScreen(): React.ReactNode {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-freedom-primary">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: t.bgColor }}>
       {/* Header */}
-      <View className="flex-row items-center px-4 py-2 border-b border-gray-100 dark:border-freedom-secondary">
+      <View
+        className="flex-row items-center px-4 py-2"
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: t.mutedTextColor + "33",
+        }}
+      >
         <Pressable
           onPress={() => {
             router.back();
           }}
           className="p-2 -ml-2"
         >
-          <Ionicons name="chevron-back" size={24} color="#2DD4BF" />
+          <Ionicons name="chevron-back" size={24} color={t.accentColor} />
         </Pressable>
-        <Text className="text-xl font-bold text-black dark:text-white ml-2">
+        <Text className="text-xl font-bold ml-2" style={{ color: t.textColor }}>
           Update Sources
         </Text>
         <View className="flex-1" />
@@ -176,14 +181,15 @@ export default function UpdateSourcesScreen(): React.ReactNode {
           onPress={() => {
             setIsAdding(true);
           }}
-          className="bg-freedom-accent/10 p-2 rounded-full"
+          className="p-2 rounded-full"
+          style={{ backgroundColor: t.accentColor + "1A" }}
         >
-          <Ionicons name="add" size={24} color="#2DD4BF" />
+          <Ionicons name="add" size={24} color={t.accentColor} />
         </Pressable>
       </View>
 
       <View className="flex-1 p-4">
-        <Text className="text-freedom-text-muted mb-4">
+        <Text className="mb-4" style={{ color: t.mutedTextColor }}>
           Manage blocklist URLs. Enabled sources will be fetched and synced when
           you tap &quot;Update &amp; Sync&quot;.
         </Text>
@@ -192,20 +198,30 @@ export default function UpdateSourcesScreen(): React.ReactNode {
           data={sources}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <View className="bg-gray-100 dark:bg-freedom-surface p-4 rounded-xl mb-3 flex-row items-center">
+            <View
+              className="p-4 rounded-xl mb-3 flex-row items-center"
+              style={{ backgroundColor: t.cardBgColor }}
+            >
               <View className="flex-1">
-                <Text className="text-black dark:text-white font-semibold">
+                <Text className="font-semibold" style={{ color: t.textColor }}>
                   {item.name}
                 </Text>
                 <Text
-                  className="text-freedom-text-muted text-xs mt-1"
+                  className="text-xs mt-1"
+                  style={{ color: t.mutedTextColor }}
                   numberOfLines={1}
                 >
                   {item.url}
                 </Text>
                 <View className="flex-row mt-2">
-                  <View className="bg-freedom-accent/20 px-2 py-0.5 rounded">
-                    <Text className="text-freedom-accent text-[10px] uppercase font-bold">
+                  <View
+                    className="px-2 py-0.5 rounded"
+                    style={{ backgroundColor: t.accentColor + "33" }}
+                  >
+                    <Text
+                      className="text-[10px] uppercase font-bold"
+                      style={{ color: t.accentColor }}
+                    >
                       {item.format}
                     </Text>
                   </View>
@@ -221,7 +237,7 @@ export default function UpdateSourcesScreen(): React.ReactNode {
                   <Ionicons
                     name={item.enabled ? "eye" : "eye-off"}
                     size={20}
-                    color={item.enabled ? "#2DD4BF" : "#94A3B8"}
+                    color={item.enabled ? t.accentColor : t.mutedTextColor}
                   />
                 </Pressable>
                 <Pressable
@@ -238,25 +254,33 @@ export default function UpdateSourcesScreen(): React.ReactNode {
         />
       </View>
 
-      <View className="p-4 border-t border-gray-100 dark:border-freedom-secondary">
+      <View
+        className="p-4"
+        style={{ borderTopWidth: 1, borderTopColor: t.mutedTextColor + "33" }}
+      >
         <Pressable
           onPress={() => {
             void handleUpdateAll();
           }}
           disabled={isUpdating}
-          className="bg-freedom-accent p-4 rounded-xl flex-row justify-center items-center"
+          className="p-4 rounded-xl flex-row justify-center items-center"
+          style={{ backgroundColor: t.accentColor }}
         >
           {isUpdating ? (
-            <ActivityIndicator color="#0B1215" size="small" className="mr-2" />
+            <ActivityIndicator
+              color={t.bgColor}
+              size="small"
+              className="mr-2"
+            />
           ) : (
             <Ionicons
               name="refresh"
               size={20}
-              color="#0B1215"
+              color={t.bgColor}
               className="mr-2"
             />
           )}
-          <Text className="text-freedom-primary font-bold text-center">
+          <Text className="font-bold text-center" style={{ color: t.bgColor }}>
             {isUpdating ? "Updating..." : "Update & Sync All"}
           </Text>
         </Pressable>
@@ -265,45 +289,67 @@ export default function UpdateSourcesScreen(): React.ReactNode {
       {/* Add Source Modal */}
       <Modal visible={isAdding} animationType="fade" transparent>
         <View className="flex-1 bg-black/50 justify-center p-6">
-          <View className="bg-white dark:bg-freedom-surface p-6 rounded-2xl">
-            <Text className="text-xl font-bold text-black dark:text-white mb-4">
+          <View
+            className="p-6 rounded-2xl"
+            style={{ backgroundColor: t.cardBgColor }}
+          >
+            <Text
+              className="text-xl font-bold mb-4"
+              style={{ color: t.textColor }}
+            >
               Add New Source
             </Text>
 
-            <Text className="text-freedom-text-muted mb-1 text-sm">
+            <Text className="mb-1 text-sm" style={{ color: t.mutedTextColor }}>
               Source Name
             </Text>
             <TextInput
               value={newName}
               onChangeText={setNewName}
               placeholder="e.g. My Blocklist"
-              placeholderTextColor="#94A3B8"
-              className="bg-gray-100 dark:bg-freedom-secondary p-3 rounded-lg text-black dark:text-white mb-4"
+              placeholderTextColor={t.mutedTextColor}
+              className="p-3 rounded-lg mb-4"
+              style={{ backgroundColor: t.bgColor, color: t.textColor }}
             />
 
-            <Text className="text-freedom-text-muted mb-1 text-sm">
+            <Text className="mb-1 text-sm" style={{ color: t.mutedTextColor }}>
               URL (Text file)
             </Text>
             <TextInput
               value={newUrl}
               onChangeText={setNewUrl}
               placeholder="https://example.com/blocklist.txt"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={t.mutedTextColor}
               autoCapitalize="none"
               keyboardType="url"
-              className="bg-gray-100 dark:bg-freedom-secondary p-3 rounded-lg text-black dark:text-white mb-4"
+              className="p-3 rounded-lg mb-4"
+              style={{ backgroundColor: t.bgColor, color: t.textColor }}
             />
 
-            <Text className="text-freedom-text-muted mb-2 text-sm">Format</Text>
+            <Text className="mb-2 text-sm" style={{ color: t.mutedTextColor }}>
+              Format
+            </Text>
             <View className="flex-row mb-6">
               <Pressable
                 onPress={() => {
                   setNewFormat("domains");
                 }}
-                className={`flex-1 p-3 rounded-lg mr-1 border ${newFormat === "domains" ? "bg-freedom-accent border-freedom-accent" : "border-gray-200 dark:border-freedom-secondary"}`}
+                className="flex-1 p-3 rounded-lg mr-1 border"
+                style={{
+                  backgroundColor:
+                    newFormat === "domains" ? t.accentColor : undefined,
+                  borderColor:
+                    newFormat === "domains"
+                      ? t.accentColor
+                      : t.mutedTextColor + "33",
+                }}
               >
                 <Text
-                  className={`text-center font-semibold text-xs ${newFormat === "domains" ? "text-freedom-primary" : "text-freedom-text-muted"}`}
+                  className="text-center font-semibold text-xs"
+                  style={{
+                    color:
+                      newFormat === "domains" ? t.bgColor : t.mutedTextColor,
+                  }}
                 >
                   Domains
                 </Text>
@@ -312,10 +358,21 @@ export default function UpdateSourcesScreen(): React.ReactNode {
                 onPress={() => {
                   setNewFormat("hosts");
                 }}
-                className={`flex-1 p-3 rounded-lg mx-1 border ${newFormat === "hosts" ? "bg-freedom-accent border-freedom-accent" : "border-gray-200 dark:border-freedom-secondary"}`}
+                className="flex-1 p-3 rounded-lg mx-1 border"
+                style={{
+                  backgroundColor:
+                    newFormat === "hosts" ? t.accentColor : undefined,
+                  borderColor:
+                    newFormat === "hosts"
+                      ? t.accentColor
+                      : t.mutedTextColor + "33",
+                }}
               >
                 <Text
-                  className={`text-center font-semibold text-xs ${newFormat === "hosts" ? "text-freedom-primary" : "text-freedom-text-muted"}`}
+                  className="text-center font-semibold text-xs"
+                  style={{
+                    color: newFormat === "hosts" ? t.bgColor : t.mutedTextColor,
+                  }}
                 >
                   Hosts
                 </Text>
@@ -324,10 +381,22 @@ export default function UpdateSourcesScreen(): React.ReactNode {
                 onPress={() => {
                   setNewFormat("keywords");
                 }}
-                className={`flex-1 p-3 rounded-lg ml-1 border ${newFormat === "keywords" ? "bg-freedom-accent border-freedom-accent" : "border-gray-200 dark:border-freedom-secondary"}`}
+                className="flex-1 p-3 rounded-lg ml-1 border"
+                style={{
+                  backgroundColor:
+                    newFormat === "keywords" ? t.accentColor : undefined,
+                  borderColor:
+                    newFormat === "keywords"
+                      ? t.accentColor
+                      : t.mutedTextColor + "33",
+                }}
               >
                 <Text
-                  className={`text-center font-semibold text-xs ${newFormat === "keywords" ? "text-freedom-primary" : "text-freedom-text-muted"}`}
+                  className="text-center font-semibold text-xs"
+                  style={{
+                    color:
+                      newFormat === "keywords" ? t.bgColor : t.mutedTextColor,
+                  }}
                 >
                   Keywords
                 </Text>
@@ -339,9 +408,10 @@ export default function UpdateSourcesScreen(): React.ReactNode {
                 onPress={() => {
                   setIsAdding(false);
                 }}
-                className="flex-1 p-3 rounded-xl border border-gray-200 dark:border-freedom-secondary mr-2"
+                className="flex-1 p-3 rounded-xl border mr-2"
+                style={{ borderColor: t.mutedTextColor + "33" }}
               >
-                <Text className="text-center text-black dark:text-white">
+                <Text className="text-center" style={{ color: t.textColor }}>
                   Cancel
                 </Text>
               </Pressable>
@@ -349,9 +419,13 @@ export default function UpdateSourcesScreen(): React.ReactNode {
                 onPress={() => {
                   handleAddSource();
                 }}
-                className="flex-1 p-3 rounded-xl bg-freedom-accent"
+                className="flex-1 p-3 rounded-xl"
+                style={{ backgroundColor: t.accentColor }}
               >
-                <Text className="text-center text-freedom-primary font-bold">
+                <Text
+                  className="text-center font-bold"
+                  style={{ color: t.bgColor }}
+                >
                   Add Source
                 </Text>
               </Pressable>
@@ -363,13 +437,21 @@ export default function UpdateSourcesScreen(): React.ReactNode {
       {/* Themed Alert Modal */}
       <Modal visible={alertModal.visible} transparent animationType="fade">
         <View className="flex-1 bg-black/60 items-center justify-center px-6">
-          <View className="bg-white dark:bg-freedom-surface w-full rounded-3xl p-6 items-center border border-freedom-highlight/20">
+          <View
+            className="w-full rounded-3xl p-6 items-center border"
+            style={{
+              backgroundColor: t.cardBgColor,
+              borderColor: t.accentColor + "33",
+            }}
+          >
             <View
-              className={`w-16 h-16 rounded-full items-center justify-center mb-4 ${
-                alertModal.type === "success"
-                  ? "bg-freedom-success/20"
-                  : "bg-freedom-danger/20"
-              }`}
+              className="w-16 h-16 rounded-full items-center justify-center mb-4"
+              style={{
+                backgroundColor:
+                  alertModal.type === "success"
+                    ? t.successColor + "33"
+                    : t.dangerColor + "33",
+              }}
             >
               <Ionicons
                 name={
@@ -381,23 +463,34 @@ export default function UpdateSourcesScreen(): React.ReactNode {
                 color={alertModal.type === "success" ? "#10B981" : "#EF4444"}
               />
             </View>
-            <Text className="text-xl font-bold text-black dark:text-white text-center mb-2">
+            <Text
+              className="text-xl font-bold text-center mb-2"
+              style={{ color: t.textColor }}
+            >
               {alertModal.title}
             </Text>
-            <Text className="text-freedom-text-muted text-center mb-6">
+            <Text
+              className="text-center mb-6"
+              style={{ color: t.mutedTextColor }}
+            >
               {alertModal.message}
             </Text>
             <Pressable
               onPress={() => {
                 setAlertModal((prev) => ({ ...prev, visible: false }));
               }}
-              className={`w-full py-4 rounded-xl items-center ${
-                alertModal.type === "success"
-                  ? "bg-freedom-highlight"
-                  : "bg-freedom-danger"
-              }`}
+              className="w-full py-4 rounded-xl items-center"
+              style={{
+                backgroundColor:
+                  alertModal.type === "success" ? t.accentColor : t.dangerColor,
+              }}
             >
-              <Text className="text-white font-bold text-lg">OK</Text>
+              <Text
+                className="font-bold text-lg"
+                style={{ color: t.textColor }}
+              >
+                OK
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -406,23 +499,39 @@ export default function UpdateSourcesScreen(): React.ReactNode {
       {/* Progress Modal */}
       {isUpdating && (
         <View className="absolute inset-0 bg-black/30 justify-center items-center pointer-events-none">
-          <View className="bg-white dark:bg-freedom-surface p-6 rounded-2xl w-2/3 items-center shadow-xl">
-            <ActivityIndicator color="#2DD4BF" size="large" />
-            <Text className="text-black dark:text-white font-bold mt-4 text-center">
+          <View
+            className="p-6 rounded-2xl w-2/3 items-center shadow-xl"
+            style={{ backgroundColor: t.cardBgColor }}
+          >
+            <ActivityIndicator color={t.accentColor} size="large" />
+            <Text
+              className="font-bold mt-4 text-center"
+              style={{ color: t.textColor }}
+            >
               Fetching Sources
             </Text>
-            <Text className="text-freedom-text-muted text-xs mt-1 text-center">
+            <Text
+              className="text-xs mt-1 text-center"
+              style={{ color: t.mutedTextColor }}
+            >
               {updateProgress.name}
             </Text>
-            <View className="w-full bg-gray-200 dark:bg-freedom-secondary h-2 rounded-full mt-4 overflow-hidden">
+            <View
+              className="w-full h-2 rounded-full mt-4 overflow-hidden"
+              style={{ backgroundColor: t.mutedTextColor + "33" }}
+            >
               <View
-                className="bg-freedom-accent h-full"
+                className="h-full"
                 style={{
+                  backgroundColor: t.accentColor,
                   width: `${(updateProgress.current / (updateProgress.total || 1)) * 100}%`,
                 }}
               />
             </View>
-            <Text className="text-freedom-text-muted text-[10px] mt-2">
+            <Text
+              className="text-[10px] mt-2"
+              style={{ color: t.mutedTextColor }}
+            >
               {updateProgress.current} / {updateProgress.total}
             </Text>
           </View>

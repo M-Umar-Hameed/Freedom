@@ -1,15 +1,13 @@
 import { AppLockScreen } from "@/components/AppLockScreen";
+import { APP_THEMES } from "@/constants/overlay-themes";
 import { getLastBlocklistUpdate } from "@/db/database";
+import { AppThemeProvider } from "@/providers/ThemeProvider";
 import { BlocklistService } from "@/services/BlocklistService";
 import { ProtectionService } from "@/services/ProtectionService";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import * as Font from "expo-font";
 import {
   Stack,
@@ -19,10 +17,9 @@ import {
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme as useNativeWindColorScheme } from "nativewind";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppState, useColorScheme } from "react-native";
+import { AppState } from "react-native";
 import "react-native-reanimated";
 import "../global.css";
 
@@ -34,14 +31,11 @@ void SplashScreen.preventAutoHideAsync().catch((_e: unknown) => {
 
 export default function RootLayout(): ReactNode {
   const isOnboarded = useAppStore((s) => s.isOnboarded);
-  const theme = useAppStore((s) => s.theme);
   const hydrateStats = useAppStore((s) => s.hydrateStats);
   const appLockEnabled = useAppStore((s) => s.appLockEnabled);
   const controlMode = useAppStore((s) => s.controlMode);
-  const systemColorScheme = useColorScheme();
   const navigationState = useRootNavigationState();
   const segments = useSegments();
-  const nativeWind = useNativeWindColorScheme();
   const [isMounted, setIsMounted] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [isLocked, setIsLocked] = useState(true);
@@ -89,20 +83,6 @@ export default function RootLayout(): ReactNode {
       });
     }
   }, [fontsLoaded, isMounted]);
-
-  const isDark = useMemo(() => {
-    if (theme === "system") return systemColorScheme === "dark";
-    return theme === "dark";
-  }, [theme, systemColorScheme]);
-
-  // Update nativewind color scheme whenever theme changes
-  useEffect(() => {
-    if (theme === "system") {
-      nativeWind.setColorScheme("system");
-    } else {
-      nativeWind.setColorScheme(theme);
-    }
-  }, [theme, nativeWind]);
 
   const keywords = useBlockingStore((s) => s.keywords);
   const includedUrls = useBlockingStore((s) => s.includedUrls);
@@ -175,28 +155,52 @@ export default function RootLayout(): ReactNode {
     }
   }, [isMounted]);
 
+  const appThemeId = useAppStore((s) => s.appThemeId);
+  const customTheme = useAppStore((s) => s.customTheme);
+  const activeTheme =
+    appThemeId === "custom" && customTheme
+      ? customTheme
+      : (APP_THEMES[appThemeId] ?? APP_THEMES.default);
+
+  const navTheme = useMemo(
+    () => ({
+      ...DarkTheme,
+      colors: {
+        ...DarkTheme.colors,
+        primary: activeTheme.accentColor,
+        background: activeTheme.bgColor,
+        card: activeTheme.cardBgColor,
+        text: activeTheme.textColor,
+        border: activeTheme.cardBgColor,
+      },
+    }),
+    [activeTheme],
+  );
+
   // Wait for both mounting and fonts to be ready for a smooth experience
   if (!isMounted || !fontsLoaded) return null;
 
   return (
-    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(onboarding)" />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="block-overlay"
-          options={{
-            presentation: "fullScreenModal",
-            gestureEnabled: false,
-            animation: "fade",
-          }}
+    <AppThemeProvider>
+      <ThemeProvider value={navTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(onboarding)" />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="block-overlay"
+            options={{
+              presentation: "fullScreenModal",
+              gestureEnabled: false,
+              animation: "fade",
+            }}
+          />
+        </Stack>
+        <StatusBar style="light" />
+        <AppLockScreen
+          visible={appLockEnabled && isLocked}
+          onUnlock={handleUnlock}
         />
-      </Stack>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <AppLockScreen
-        visible={appLockEnabled && isLocked}
-        onUnlock={handleUnlock}
-      />
-    </ThemeProvider>
+      </ThemeProvider>
+    </AppThemeProvider>
   );
 }

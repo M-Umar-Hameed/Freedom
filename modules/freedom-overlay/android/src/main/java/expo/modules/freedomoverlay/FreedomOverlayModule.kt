@@ -1,5 +1,6 @@
 package expo.modules.freedomoverlay
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -95,6 +96,23 @@ class FreedomOverlayModule : Module() {
 
         AsyncFunction("isOverlayShowing") { promise: Promise ->
             promise.resolve(OverlayService.isShowing)
+        }
+
+        AsyncFunction("updateOverlayTheme") { themeJson: String, promise: Promise ->
+            try {
+                val context = appContext.reactContext
+                    ?: run {
+                        promise.resolve(null)
+                        return@AsyncFunction
+                    }
+                context.getSharedPreferences("freedom_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("overlay_theme", themeJson)
+                    .apply()
+                promise.resolve(null)
+            } catch (e: Exception) {
+                promise.reject("ERR_OVERLAY_THEME", e.message, e)
+            }
         }
     }
 }

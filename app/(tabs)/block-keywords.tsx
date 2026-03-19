@@ -1,4 +1,5 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { ProtectionService } from "@/services/ProtectionService";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
@@ -10,6 +11,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function BlockKeywordsScreen(): ReactNode {
+  const t = useAppTheme();
   const [newKeyword, setNewKeyword] = useState("");
   const [pendingAction, setPendingAction] = useState<{
     type: "add" | "remove" | "remove_multiple" | "remove_all";
@@ -93,7 +95,8 @@ export default function BlockKeywordsScreen(): ReactNode {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white dark:bg-freedom-primary"
+      className="flex-1"
+      style={{ backgroundColor: t.bgColor }}
       edges={["top"]}
     >
       <ScrollView
@@ -101,26 +104,34 @@ export default function BlockKeywordsScreen(): ReactNode {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <Text className="text-2xl font-bold text-black dark:text-white mb-2">
+        <Text
+          className="text-2xl font-bold mb-2"
+          style={{ color: t.textColor }}
+        >
           Block Keywords
         </Text>
-        <Text className="text-freedom-text-muted mb-6">
+        <Text className="mb-6" style={{ color: t.mutedTextColor }}>
           Content containing these keywords will be blocked
         </Text>
 
         {/* Add Keyword Input */}
         <View className="flex-row gap-2 mb-6">
           <TextInput
-            className="flex-1 bg-gray-100 dark:bg-freedom-surface text-black dark:text-white px-4 py-3 rounded-xl"
+            className="flex-1 px-4 py-3 rounded-xl"
+            style={{
+              backgroundColor: t.cardBgColor,
+              color: t.textColor,
+            }}
             placeholder="Enter keyword..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={t.mutedTextColor}
             value={newKeyword}
             onChangeText={setNewKeyword}
             onSubmitEditing={handleAddPress}
           />
           <Pressable
             onPress={handleAddPress}
-            className="bg-freedom-highlight px-4 rounded-xl items-center justify-center active:opacity-70 active:scale-95 transition-all"
+            className="px-4 rounded-xl items-center justify-center active:opacity-70 active:scale-95 transition-all"
+            style={{ backgroundColor: t.accentColor }}
           >
             <Ionicons name="add-circle-outline" size={24} color="white" />
           </Pressable>
@@ -132,7 +143,10 @@ export default function BlockKeywordsScreen(): ReactNode {
             <View className="flex-row items-center justify-between mb-4">
               {!isSelectionMode ? (
                 <>
-                  <Text className="text-xl font-bold text-black dark:text-white">
+                  <Text
+                    className="text-xl font-bold"
+                    style={{ color: t.textColor }}
+                  >
                     Directory
                   </Text>
                   <View className="flex-row gap-2">
@@ -140,9 +154,13 @@ export default function BlockKeywordsScreen(): ReactNode {
                       onPress={() => {
                         setIsSelectionMode(true);
                       }}
-                      className="bg-freedom-highlight px-4 py-2 rounded-lg active:opacity-70"
+                      className="px-4 py-2 rounded-lg active:opacity-70"
+                      style={{ backgroundColor: t.accentColor }}
                     >
-                      <Text className="text-white font-bold tracking-wide">
+                      <Text
+                        className="font-bold tracking-wide"
+                        style={{ color: t.textColor }}
+                      >
                         Select
                       </Text>
                     </Pressable>
@@ -152,9 +170,13 @@ export default function BlockKeywordsScreen(): ReactNode {
                           void performRemoveMultiple(true);
                         else setPendingAction({ type: "remove_all" });
                       }}
-                      className="bg-red-100 dark:bg-red-900/30 px-4 py-2 rounded-lg"
+                      className="px-4 py-2 rounded-lg"
+                      style={{ backgroundColor: t.dangerColor + "20" }}
                     >
-                      <Text className="text-red-600 dark:text-red-400 font-medium">
+                      <Text
+                        className="font-medium"
+                        style={{ color: t.dangerColor }}
+                      >
                         Delete All
                       </Text>
                     </Pressable>
@@ -162,7 +184,10 @@ export default function BlockKeywordsScreen(): ReactNode {
                 </>
               ) : (
                 <>
-                  <Text className="text-lg font-bold text-black dark:text-white">
+                  <Text
+                    className="text-lg font-bold"
+                    style={{ color: t.textColor }}
+                  >
                     {selectedKeywords.size} Selected
                   </Text>
                   <View className="flex-row gap-2">
@@ -172,9 +197,17 @@ export default function BlockKeywordsScreen(): ReactNode {
                           setSelectedKeywords(new Set());
                         else setSelectedKeywords(new Set(filteredKeywords));
                       }}
-                      className="bg-freedom-highlight/20 dark:bg-freedom-highlight/30 px-3 py-2 rounded-lg border border-freedom-highlight/40 active:opacity-70"
+                      className="px-3 py-2 rounded-lg active:opacity-70"
+                      style={{
+                        backgroundColor: t.accentColor + "33",
+                        borderWidth: 1,
+                        borderColor: t.accentColor + "66",
+                      }}
                     >
-                      <Text className="text-freedom-highlight font-bold">
+                      <Text
+                        className="font-bold"
+                        style={{ color: t.accentColor }}
+                      >
                         {selectedKeywords.size === filteredKeywords.length
                           ? "Deselect"
                           : "Select All"}
@@ -186,19 +219,32 @@ export default function BlockKeywordsScreen(): ReactNode {
                           void performRemoveMultiple(false);
                         else setPendingAction({ type: "remove_multiple" });
                       }}
-                      className={`px-3 py-2 rounded-lg ${selectedKeywords.size > 0 ? "bg-red-500" : "bg-gray-300 dark:bg-gray-700"}`}
+                      className="px-3 py-2 rounded-lg"
+                      style={{
+                        backgroundColor:
+                          selectedKeywords.size > 0 ? "#EF4444" : t.cardBgColor,
+                      }}
                       disabled={selectedKeywords.size === 0}
                     >
-                      <Text className="text-white font-medium">Delete</Text>
+                      <Text
+                        className="font-medium"
+                        style={{ color: t.textColor }}
+                      >
+                        Delete
+                      </Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
                         setIsSelectionMode(false);
                         setSelectedKeywords(new Set());
                       }}
-                      className="bg-gray-200 dark:bg-gray-800 px-3 py-2 rounded-lg active:opacity-70"
+                      className="px-3 py-2 rounded-lg active:opacity-70"
+                      style={{ backgroundColor: t.cardBgColor }}
                     >
-                      <Text className="text-gray-700 dark:text-gray-300 font-bold">
+                      <Text
+                        className="font-bold"
+                        style={{ color: t.mutedTextColor }}
+                      >
                         Cancel
                       </Text>
                     </Pressable>
@@ -208,13 +254,19 @@ export default function BlockKeywordsScreen(): ReactNode {
             </View>
 
             <TextInput
-              className="bg-gray-100 dark:bg-freedom-surface text-black dark:text-white px-4 py-3 rounded-xl border border-gray-200 dark:border-freedom-surface"
+              className="px-4 py-3 rounded-xl"
+              style={{
+                backgroundColor: t.cardBgColor,
+                color: t.textColor,
+                borderWidth: 1,
+                borderColor: t.mutedTextColor + "33",
+              }}
               placeholder="Search existing keywords..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={t.mutedTextColor}
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
-                setDisplayLimit(50); // Reset limit on new search
+                setDisplayLimit(50);
               }}
             />
           </View>
@@ -222,16 +274,22 @@ export default function BlockKeywordsScreen(): ReactNode {
 
         {/* Keywords List */}
         {keywords.length === 0 ? (
-          <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl p-8 items-center">
-            <Ionicons name="text-outline" size={48} color="#94A3B8" />
-            <Text className="text-freedom-text-muted mt-4 text-center">
+          <View
+            className="rounded-xl p-8 items-center"
+            style={{ backgroundColor: t.cardBgColor }}
+          >
+            <Ionicons name="text-outline" size={48} color={t.mutedTextColor} />
+            <Text
+              className="mt-4 text-center"
+              style={{ color: t.mutedTextColor }}
+            >
               No keywords added yet. Add keywords that should trigger content
               blocking.
             </Text>
           </View>
         ) : (
           <View className="flex-col pb-10">
-            <Text className="text-freedom-text-muted mb-3 text-xs">
+            <Text className="mb-3 text-xs" style={{ color: t.mutedTextColor }}>
               {filteredKeywords.length} keywords total{" "}
               {searchQuery ? "found" : ""}
             </Text>
@@ -243,7 +301,20 @@ export default function BlockKeywordsScreen(): ReactNode {
                     if (isSelectionMode) toggleSelection(keyword);
                     else handleRemovePress(keyword);
                   }}
-                  className={`flex-row items-center px-3 py-2 rounded-lg active:opacity-50 ${isSelectionMode && selectedKeywords.has(keyword) ? "bg-freedom-highlight/20 border border-freedom-highlight" : "bg-gray-100 dark:bg-freedom-surface border border-transparent"}`}
+                  className="flex-row items-center px-3 py-2 rounded-lg active:opacity-50"
+                  style={
+                    isSelectionMode && selectedKeywords.has(keyword)
+                      ? {
+                          backgroundColor: t.accentColor + "33",
+                          borderWidth: 1,
+                          borderColor: t.accentColor,
+                        }
+                      : {
+                          backgroundColor: t.cardBgColor,
+                          borderWidth: 1,
+                          borderColor: "transparent",
+                        }
+                  }
                 >
                   {isSelectionMode && (
                     <Ionicons
@@ -254,12 +325,14 @@ export default function BlockKeywordsScreen(): ReactNode {
                       }
                       size={18}
                       color={
-                        selectedKeywords.has(keyword) ? "#3B82F6" : "#94A3B8"
+                        selectedKeywords.has(keyword)
+                          ? "#3B82F6"
+                          : t.mutedTextColor
                       }
                       style={{ marginRight: 6 }}
                     />
                   )}
-                  <Text className="text-black dark:text-white mr-2">
+                  <Text className="mr-2" style={{ color: t.textColor }}>
                     {keyword}
                   </Text>
                   {!isSelectionMode && (
@@ -278,9 +351,10 @@ export default function BlockKeywordsScreen(): ReactNode {
                 onPress={() => {
                   setDisplayLimit((prev) => prev + 100);
                 }}
-                className="mt-6 py-3 px-6 bg-gray-100 dark:bg-freedom-surface rounded-xl items-center self-center"
+                className="mt-6 py-3 px-6 rounded-xl items-center self-center"
+                style={{ backgroundColor: t.cardBgColor }}
               >
-                <Text className="text-freedom-primary font-bold">
+                <Text className="font-bold" style={{ color: t.accentColor }}>
                   Load More ({filteredKeywords.length - displayLimit} remain)
                 </Text>
               </Pressable>

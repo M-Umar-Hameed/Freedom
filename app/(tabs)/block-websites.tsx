@@ -1,4 +1,5 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
 import type { ControlMode, SurveillanceConfig } from "@/types/blocking";
@@ -50,6 +51,7 @@ const CONTROL_MODES: {
 ];
 
 export default function BlockWebsitesScreen(): ReactNode {
+  const t = useAppTheme();
   const [activeTab, setActiveTab] = useState<Tab>("keywords");
   const [newValue, setNewValue] = useState("");
   const [pendingAction, setPendingAction] = useState<{
@@ -215,7 +217,8 @@ export default function BlockWebsitesScreen(): ReactNode {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white dark:bg-freedom-primary"
+      className="flex-1"
+      style={{ backgroundColor: t.bgColor }}
       edges={["top"]}
     >
       <ScrollView
@@ -225,7 +228,7 @@ export default function BlockWebsitesScreen(): ReactNode {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-2xl font-bold text-black dark:text-white">
+          <Text className="text-2xl font-bold" style={{ color: t.textColor }}>
             Content Blocking
           </Text>
           <Pressable
@@ -234,7 +237,8 @@ export default function BlockWebsitesScreen(): ReactNode {
               setPendingSurveillance(siteSurveillance);
               setShowModeModal(true);
             }}
-            className="flex-row items-center bg-gray-100 dark:bg-freedom-surface px-3 py-2 rounded-xl"
+            className="flex-row items-center px-3 py-2 rounded-xl"
+            style={{ backgroundColor: t.cardBgColor }}
           >
             <Ionicons
               name={
@@ -253,12 +257,15 @@ export default function BlockWebsitesScreen(): ReactNode {
             </Text>
           </Pressable>
         </View>
-        <Text className="text-freedom-text-muted mb-6">
+        <Text className="mb-6" style={{ color: t.mutedTextColor }}>
           Manage keywords, blocked and whitelisted websites
         </Text>
 
         {/* 3-Tab Switcher */}
-        <View className="flex-row bg-gray-100 dark:bg-freedom-surface rounded-xl p-1 mb-6">
+        <View
+          className="flex-row rounded-xl p-1 mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
           {(
             [
               { id: "keywords", label: "Keywords", count: keywords.length },
@@ -281,16 +288,18 @@ export default function BlockWebsitesScreen(): ReactNode {
                   setSelectedKeywords(new Set());
                 }
               }}
-              className={`flex-1 py-3 rounded-lg items-center ${
-                activeTab === tab.id ? "bg-freedom-highlight" : "bg-transparent"
-              }`}
+              className="flex-1 py-3 rounded-lg items-center"
+              style={
+                activeTab === tab.id
+                  ? { backgroundColor: t.accentColor }
+                  : undefined
+              }
             >
               <Text
-                className={`font-semibold text-xs ${
-                  activeTab === tab.id
-                    ? "text-white"
-                    : "text-freedom-text-muted"
-                }`}
+                className="font-semibold text-xs"
+                style={{
+                  color: activeTab === tab.id ? t.textColor : t.mutedTextColor,
+                }}
               >
                 {tab.label} ({tab.count})
               </Text>
@@ -301,13 +310,17 @@ export default function BlockWebsitesScreen(): ReactNode {
         {/* Add Input */}
         <View className="flex-row gap-2 mb-6">
           <TextInput
-            className="flex-1 bg-gray-100 dark:bg-freedom-surface text-black dark:text-white px-4 py-3 rounded-xl"
+            className="flex-1 px-4 py-3 rounded-xl"
+            style={{
+              backgroundColor: t.cardBgColor,
+              color: t.textColor,
+            }}
             placeholder={
               activeTab === "keywords"
                 ? "Enter keyword..."
                 : "Enter domain (e.g. example.com)..."
             }
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={t.mutedTextColor}
             value={newValue}
             onChangeText={setNewValue}
             onSubmitEditing={handleAddPress}
@@ -316,7 +329,8 @@ export default function BlockWebsitesScreen(): ReactNode {
           />
           <Pressable
             onPress={handleAddPress}
-            className="bg-freedom-highlight px-4 rounded-xl items-center justify-center"
+            className="px-4 rounded-xl items-center justify-center"
+            style={{ backgroundColor: t.accentColor }}
           >
             <Ionicons name="add-circle-outline" size={24} color="white" />
           </Pressable>
@@ -330,7 +344,10 @@ export default function BlockWebsitesScreen(): ReactNode {
                 <View className="flex-row items-center justify-between mb-4">
                   {!isSelectionMode ? (
                     <>
-                      <Text className="text-xl font-bold text-black dark:text-white">
+                      <Text
+                        className="text-xl font-bold"
+                        style={{ color: t.textColor }}
+                      >
                         Directory
                       </Text>
                       <View className="flex-row gap-2">
@@ -338,9 +355,13 @@ export default function BlockWebsitesScreen(): ReactNode {
                           onPress={() => {
                             setIsSelectionMode(true);
                           }}
-                          className="bg-freedom-highlight px-4 py-2 rounded-lg active:opacity-70"
+                          className="px-4 py-2 rounded-lg active:opacity-70"
+                          style={{ backgroundColor: t.accentColor }}
                         >
-                          <Text className="text-white font-bold tracking-wide">
+                          <Text
+                            className="font-bold tracking-wide"
+                            style={{ color: t.textColor }}
+                          >
                             Select
                           </Text>
                         </Pressable>
@@ -354,9 +375,13 @@ export default function BlockWebsitesScreen(): ReactNode {
                                 tab: "keywords",
                               });
                           }}
-                          className="bg-red-100 dark:bg-red-900/30 px-4 py-2 rounded-lg"
+                          className="px-4 py-2 rounded-lg"
+                          style={{ backgroundColor: t.dangerColor + "20" }}
                         >
-                          <Text className="text-red-600 dark:text-red-400 font-medium">
+                          <Text
+                            className="font-medium"
+                            style={{ color: t.dangerColor }}
+                          >
                             Delete All
                           </Text>
                         </Pressable>
@@ -364,7 +389,10 @@ export default function BlockWebsitesScreen(): ReactNode {
                     </>
                   ) : (
                     <>
-                      <Text className="text-lg font-bold text-black dark:text-white">
+                      <Text
+                        className="text-lg font-bold"
+                        style={{ color: t.textColor }}
+                      >
                         {selectedKeywords.size} Selected
                       </Text>
                       <View className="flex-row gap-2">
@@ -376,9 +404,17 @@ export default function BlockWebsitesScreen(): ReactNode {
                               setSelectedKeywords(new Set());
                             else setSelectedKeywords(new Set(filteredKeywords));
                           }}
-                          className="bg-freedom-highlight/20 dark:bg-freedom-highlight/30 px-3 py-2 rounded-lg border border-freedom-highlight/40 active:opacity-70"
+                          className="px-3 py-2 rounded-lg active:opacity-70"
+                          style={{
+                            backgroundColor: t.accentColor + "33",
+                            borderWidth: 1,
+                            borderColor: t.accentColor + "66",
+                          }}
                         >
-                          <Text className="text-freedom-highlight font-bold">
+                          <Text
+                            className="font-bold"
+                            style={{ color: t.accentColor }}
+                          >
                             {selectedKeywords.size === filteredKeywords.length
                               ? "Deselect"
                               : "Select All"}
@@ -394,19 +430,34 @@ export default function BlockWebsitesScreen(): ReactNode {
                                 tab: "keywords",
                               });
                           }}
-                          className={`px-3 py-2 rounded-lg ${selectedKeywords.size > 0 ? "bg-red-500" : "bg-gray-300 dark:bg-gray-700"}`}
+                          className="px-3 py-2 rounded-lg"
+                          style={{
+                            backgroundColor:
+                              selectedKeywords.size > 0
+                                ? "#EF4444"
+                                : t.cardBgColor,
+                          }}
                           disabled={selectedKeywords.size === 0}
                         >
-                          <Text className="text-white font-medium">Delete</Text>
+                          <Text
+                            className="font-medium"
+                            style={{ color: t.textColor }}
+                          >
+                            Delete
+                          </Text>
                         </Pressable>
                         <Pressable
                           onPress={() => {
                             setIsSelectionMode(false);
                             setSelectedKeywords(new Set());
                           }}
-                          className="bg-gray-200 dark:bg-gray-800 px-3 py-2 rounded-lg active:opacity-70"
+                          className="px-3 py-2 rounded-lg active:opacity-70"
+                          style={{ backgroundColor: t.cardBgColor }}
                         >
-                          <Text className="text-gray-700 dark:text-gray-300 font-bold">
+                          <Text
+                            className="font-bold"
+                            style={{ color: t.mutedTextColor }}
+                          >
                             Cancel
                           </Text>
                         </Pressable>
@@ -416,9 +467,15 @@ export default function BlockWebsitesScreen(): ReactNode {
                 </View>
 
                 <TextInput
-                  className="bg-gray-100 dark:bg-freedom-surface text-black dark:text-white px-4 py-3 rounded-xl border border-gray-200 dark:border-freedom-surface"
+                  className="px-4 py-3 rounded-xl"
+                  style={{
+                    backgroundColor: t.cardBgColor,
+                    color: t.textColor,
+                    borderWidth: 1,
+                    borderColor: t.mutedTextColor + "33",
+                  }}
                   placeholder="Search existing keywords..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={t.mutedTextColor}
                   value={searchQuery}
                   onChangeText={(text) => {
                     setSearchQuery(text);
@@ -429,16 +486,29 @@ export default function BlockWebsitesScreen(): ReactNode {
             )}
 
             {keywords.length === 0 ? (
-              <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl p-8 items-center">
-                <Ionicons name="text-outline" size={48} color="#94A3B8" />
-                <Text className="text-freedom-text-muted mt-4 text-center">
+              <View
+                className="rounded-xl p-8 items-center"
+                style={{ backgroundColor: t.cardBgColor }}
+              >
+                <Ionicons
+                  name="text-outline"
+                  size={48}
+                  color={t.mutedTextColor}
+                />
+                <Text
+                  className="mt-4 text-center"
+                  style={{ color: t.mutedTextColor }}
+                >
                   No keywords added yet. Add keywords that should trigger
                   content blocking.
                 </Text>
               </View>
             ) : (
               <View className="flex-col pb-10">
-                <Text className="text-freedom-text-muted mb-3 text-xs">
+                <Text
+                  className="mb-3 text-xs"
+                  style={{ color: t.mutedTextColor }}
+                >
                   {filteredKeywords.length} keywords total{" "}
                   {searchQuery ? "found" : ""}
                 </Text>
@@ -450,7 +520,20 @@ export default function BlockWebsitesScreen(): ReactNode {
                         if (isSelectionMode) toggleSelection(keyword);
                         else handleRemovePress(keyword);
                       }}
-                      className={`flex-row items-center px-3 py-2 rounded-lg active:opacity-50 ${isSelectionMode && selectedKeywords.has(keyword) ? "bg-freedom-highlight/20 border border-freedom-highlight" : "bg-gray-100 dark:bg-freedom-surface border border-transparent"}`}
+                      className="flex-row items-center px-3 py-2 rounded-lg active:opacity-50"
+                      style={
+                        isSelectionMode && selectedKeywords.has(keyword)
+                          ? {
+                              backgroundColor: t.accentColor + "33",
+                              borderWidth: 1,
+                              borderColor: t.accentColor,
+                            }
+                          : {
+                              backgroundColor: t.cardBgColor,
+                              borderWidth: 1,
+                              borderColor: "transparent",
+                            }
+                      }
                     >
                       {isSelectionMode && (
                         <Ionicons
@@ -463,12 +546,12 @@ export default function BlockWebsitesScreen(): ReactNode {
                           color={
                             selectedKeywords.has(keyword)
                               ? "#3B82F6"
-                              : "#94A3B8"
+                              : t.mutedTextColor
                           }
                           style={{ marginRight: 6 }}
                         />
                       )}
-                      <Text className="text-black dark:text-white mr-2">
+                      <Text className="mr-2" style={{ color: t.textColor }}>
                         {keyword}
                       </Text>
                       {!isSelectionMode && (
@@ -487,9 +570,13 @@ export default function BlockWebsitesScreen(): ReactNode {
                     onPress={() => {
                       setDisplayLimit((prev) => prev + 100);
                     }}
-                    className="mt-6 py-3 px-6 bg-gray-100 dark:bg-freedom-surface rounded-xl items-center self-center"
+                    className="mt-6 py-3 px-6 rounded-xl items-center self-center"
+                    style={{ backgroundColor: t.cardBgColor }}
                   >
-                    <Text className="text-freedom-highlight font-bold">
+                    <Text
+                      className="font-bold"
+                      style={{ color: t.accentColor }}
+                    >
                       Load More ({filteredKeywords.length - displayLimit}{" "}
                       remain)
                     </Text>
@@ -505,9 +592,19 @@ export default function BlockWebsitesScreen(): ReactNode {
           <>
             {(activeTab === "blocked" ? includedUrls : excludedUrls).length ===
             0 ? (
-              <View className="bg-gray-100 dark:bg-freedom-surface rounded-xl p-8 items-center">
-                <Ionicons name="globe-outline" size={48} color="#94A3B8" />
-                <Text className="text-freedom-text-muted mt-4 text-center">
+              <View
+                className="rounded-xl p-8 items-center"
+                style={{ backgroundColor: t.cardBgColor }}
+              >
+                <Ionicons
+                  name="globe-outline"
+                  size={48}
+                  color={t.mutedTextColor}
+                />
+                <Text
+                  className="mt-4 text-center"
+                  style={{ color: t.mutedTextColor }}
+                >
                   {activeTab === "blocked"
                     ? "No blocked websites. Add domains to block."
                     : "No whitelisted websites. Add domains to exclude from blocking."}
@@ -519,7 +616,11 @@ export default function BlockWebsitesScreen(): ReactNode {
                   (entry) => (
                     <View
                       key={entry.url}
-                      className={`bg-gray-100 dark:bg-freedom-surface flex-row items-center justify-between px-4 py-3 rounded-xl ${!entry.enabled ? "opacity-50" : ""}`}
+                      className="flex-row items-center justify-between px-4 py-3 rounded-xl"
+                      style={{
+                        backgroundColor: t.cardBgColor,
+                        opacity: entry.enabled ? 1 : 0.5,
+                      }}
                     >
                       <View className="flex-row items-center flex-1">
                         <Ionicons
@@ -530,10 +631,13 @@ export default function BlockWebsitesScreen(): ReactNode {
                           }
                           size={20}
                           color={
-                            activeTab === "blocked" ? "#EF4444" : "#2DD4BF"
+                            activeTab === "blocked" ? "#EF4444" : t.accentColor
                           }
                         />
-                        <Text className="text-black dark:text-white ml-3 flex-1">
+                        <Text
+                          className="ml-3 flex-1"
+                          style={{ color: t.textColor }}
+                        >
                           {entry.url}
                         </Text>
                       </View>
@@ -543,11 +647,12 @@ export default function BlockWebsitesScreen(): ReactNode {
                           onPress={() => {
                             handleTogglePress(entry.url);
                           }}
-                          className={`w-12 h-6 rounded-full px-1 justify-center ${
-                            entry.enabled
-                              ? "bg-freedom-highlight"
-                              : "bg-gray-400"
-                          }`}
+                          className="w-12 h-6 rounded-full px-1 justify-center"
+                          style={{
+                            backgroundColor: entry.enabled
+                              ? t.accentColor
+                              : "#9CA3AF",
+                          }}
                         >
                           <View
                             className={`w-4 h-4 rounded-full bg-white ${
@@ -565,7 +670,7 @@ export default function BlockWebsitesScreen(): ReactNode {
                           <Ionicons
                             name="trash-outline"
                             size={18}
-                            color="#94A3B8"
+                            color={t.mutedTextColor}
                           />
                         </Pressable>
                       </View>
@@ -581,21 +686,28 @@ export default function BlockWebsitesScreen(): ReactNode {
       {/* Control Mode Modal */}
       <Modal visible={showModeModal} animationType="slide" transparent>
         <View className="flex-1 bg-black/60 pt-20">
-          <View className="flex-1 bg-white dark:bg-freedom-primary rounded-t-[40px] p-6">
+          <View
+            className="flex-1 rounded-t-[40px] p-6"
+            style={{ backgroundColor: t.bgColor }}
+          >
             <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-xl font-bold text-black dark:text-white">
+              <Text
+                className="text-xl font-bold"
+                style={{ color: t.textColor }}
+              >
                 Content Control Mode
               </Text>
               <Pressable
                 onPress={() => {
                   setShowModeModal(false);
                 }}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                className="w-10 h-10 rounded-full items-center justify-center"
+                style={{ backgroundColor: t.cardBgColor }}
               >
-                <Ionicons name="close" size={24} color="#94A3B8" />
+                <Ionicons name="close" size={24} color={t.mutedTextColor} />
               </Pressable>
             </View>
-            <Text className="text-freedom-text-muted text-sm mb-6">
+            <Text className="text-sm mb-6" style={{ color: t.mutedTextColor }}>
               Controls friction for keyword and website changes. Works under the
               main control mode.
             </Text>
@@ -607,11 +719,16 @@ export default function BlockWebsitesScreen(): ReactNode {
                   onPress={() => {
                     handleSelectMode(mode.id);
                   }}
-                  className={`p-4 rounded-2xl mb-3 border-2 ${
-                    pendingMode === mode.id
-                      ? "bg-freedom-highlight/5 border-freedom-highlight"
-                      : "bg-gray-100 dark:bg-freedom-surface border-transparent"
-                  }`}
+                  className="p-4 rounded-2xl mb-3"
+                  style={{
+                    borderWidth: 2,
+                    backgroundColor:
+                      pendingMode === mode.id
+                        ? t.accentColor + "0D"
+                        : t.cardBgColor,
+                    borderColor:
+                      pendingMode === mode.id ? t.accentColor : "transparent",
+                  }}
                 >
                   <View className="flex-row items-start">
                     <View
@@ -628,18 +745,24 @@ export default function BlockWebsitesScreen(): ReactNode {
                     </View>
                     <View className="flex-1 ml-3">
                       <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-bold text-black dark:text-white">
+                        <Text
+                          className="text-base font-bold"
+                          style={{ color: t.textColor }}
+                        >
                           {mode.title}
                         </Text>
                         {pendingMode === mode.id && (
                           <Ionicons
                             name="checkmark-circle"
                             size={22}
-                            color="#2DD4BF"
+                            color={t.accentColor}
                           />
                         )}
                       </View>
-                      <Text className="text-freedom-text-muted text-sm mt-0.5">
+                      <Text
+                        className="text-sm mt-0.5"
+                        style={{ color: t.mutedTextColor }}
+                      >
                         {mode.description}
                       </Text>
                     </View>
@@ -654,13 +777,19 @@ export default function BlockWebsitesScreen(): ReactNode {
                     <Ionicons
                       name="settings-outline"
                       size={18}
-                      color="#2DD4BF"
+                      color={t.accentColor}
                     />
-                    <Text className="text-sm font-bold text-freedom-highlight uppercase ml-2">
+                    <Text
+                      className="text-sm font-bold uppercase ml-2"
+                      style={{ color: t.accentColor }}
+                    >
                       Friction Setup
                     </Text>
                   </View>
-                  <View className="bg-gray-100 dark:bg-freedom-surface rounded-2xl p-5">
+                  <View
+                    className="rounded-2xl p-5"
+                    style={{ backgroundColor: t.cardBgColor }}
+                  >
                     <View className="flex-row gap-3 mb-6">
                       {(["timer", "click", "time"] as const).map((type) => (
                         <Pressable
@@ -679,11 +808,18 @@ export default function BlockWebsitesScreen(): ReactNode {
                                 : {}),
                             });
                           }}
-                          className={`flex-1 p-4 rounded-xl items-center border-2 ${
-                            pendingSurveillance.type === type
-                              ? "bg-freedom-highlight/10 border-freedom-highlight"
-                              : "bg-white dark:bg-freedom-primary border-transparent"
-                          }`}
+                          className="flex-1 p-4 rounded-xl items-center"
+                          style={{
+                            borderWidth: 2,
+                            backgroundColor:
+                              pendingSurveillance.type === type
+                                ? t.accentColor + "1A"
+                                : t.bgColor,
+                            borderColor:
+                              pendingSurveillance.type === type
+                                ? t.accentColor
+                                : "transparent",
+                          }}
                         >
                           <Ionicons
                             name={
@@ -698,16 +834,18 @@ export default function BlockWebsitesScreen(): ReactNode {
                             size={24}
                             color={
                               pendingSurveillance.type === type
-                                ? "#2DD4BF"
-                                : "#94A3B8"
+                                ? t.accentColor
+                                : t.mutedTextColor
                             }
                           />
                           <Text
-                            className={`font-bold mt-1 ${
-                              pendingSurveillance.type === type
-                                ? "text-freedom-highlight"
-                                : "text-freedom-text-muted"
-                            }`}
+                            className="font-bold mt-1"
+                            style={{
+                              color:
+                                pendingSurveillance.type === type
+                                  ? t.accentColor
+                                  : t.mutedTextColor,
+                            }}
                           >
                             {type === "timer"
                               ? "Timer"
@@ -720,7 +858,14 @@ export default function BlockWebsitesScreen(): ReactNode {
                     </View>
 
                     {pendingSurveillance.type === "time" ? (
-                      <View className="bg-white dark:bg-freedom-primary p-4 rounded-xl border border-gray-200 dark:border-freedom-secondary">
+                      <View
+                        className="p-4 rounded-xl"
+                        style={{
+                          backgroundColor: t.bgColor,
+                          borderWidth: 1,
+                          borderColor: t.mutedTextColor + "33",
+                        }}
+                      >
                         {[
                           {
                             label: "Start",
@@ -733,7 +878,10 @@ export default function BlockWebsitesScreen(): ReactNode {
                             key={key}
                             className="flex-row items-center justify-between mb-2"
                           >
-                            <Text className="text-freedom-text-muted font-bold">
+                            <Text
+                              className="font-bold"
+                              style={{ color: t.mutedTextColor }}
+                            >
                               {label}
                             </Text>
                             <View className="flex-row items-center gap-4">
@@ -748,7 +896,8 @@ export default function BlockWebsitesScreen(): ReactNode {
                                       24,
                                   });
                                 }}
-                                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                                className="w-10 h-10 rounded-full items-center justify-center"
+                                style={{ backgroundColor: t.cardBgColor }}
                               >
                                 <Ionicons
                                   name="remove"
@@ -756,7 +905,10 @@ export default function BlockWebsitesScreen(): ReactNode {
                                   color="#EF4444"
                                 />
                               </Pressable>
-                              <Text className="text-xl font-bold text-black dark:text-white w-20 text-center">
+                              <Text
+                                className="text-xl font-bold w-20 text-center"
+                                style={{ color: t.textColor }}
+                              >
                                 {formatHour(pendingSurveillance[key] ?? def)}
                               </Text>
                               <Pressable
@@ -768,7 +920,8 @@ export default function BlockWebsitesScreen(): ReactNode {
                                       24,
                                   });
                                 }}
-                                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                                className="w-10 h-10 rounded-full items-center justify-center"
+                                style={{ backgroundColor: t.cardBgColor }}
                               >
                                 <Ionicons
                                   name="add"
@@ -781,7 +934,14 @@ export default function BlockWebsitesScreen(): ReactNode {
                         ))}
                       </View>
                     ) : (
-                      <View className="flex-row items-center justify-between bg-white dark:bg-freedom-primary p-4 rounded-xl border border-gray-200 dark:border-freedom-secondary">
+                      <View
+                        className="flex-row items-center justify-between p-4 rounded-xl"
+                        style={{
+                          backgroundColor: t.bgColor,
+                          borderWidth: 1,
+                          borderColor: t.mutedTextColor + "33",
+                        }}
+                      >
                         <Pressable
                           onPress={() => {
                             const step =
@@ -796,15 +956,26 @@ export default function BlockWebsitesScreen(): ReactNode {
                               ),
                             });
                           }}
-                          className="w-12 h-12 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                          className="w-12 h-12 rounded-full items-center justify-center"
+                          style={{ backgroundColor: t.cardBgColor }}
                         >
-                          <Ionicons name="remove" size={28} color="#2DD4BF" />
+                          <Ionicons
+                            name="remove"
+                            size={28}
+                            color={t.accentColor}
+                          />
                         </Pressable>
                         <View className="items-center">
-                          <Text className="text-3xl font-bold text-black dark:text-white">
+                          <Text
+                            className="text-3xl font-bold"
+                            style={{ color: t.textColor }}
+                          >
                             {pendingSurveillance.value}
                           </Text>
-                          <Text className="text-freedom-text-muted text-xs font-semibold uppercase">
+                          <Text
+                            className="text-xs font-semibold uppercase"
+                            style={{ color: t.mutedTextColor }}
+                          >
                             {pendingSurveillance.type === "timer"
                               ? "Seconds"
                               : "Taps"}
@@ -822,9 +993,14 @@ export default function BlockWebsitesScreen(): ReactNode {
                               ),
                             });
                           }}
-                          className="w-12 h-12 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                          className="w-12 h-12 rounded-full items-center justify-center"
+                          style={{ backgroundColor: t.cardBgColor }}
                         >
-                          <Ionicons name="add" size={28} color="#2DD4BF" />
+                          <Ionicons
+                            name="add"
+                            size={28}
+                            color={t.accentColor}
+                          />
                         </Pressable>
                       </View>
                     )}
@@ -835,9 +1011,17 @@ export default function BlockWebsitesScreen(): ReactNode {
               {isModeChanged && (
                 <Pressable
                   onPress={handleSaveMode}
-                  className="bg-freedom-highlight p-5 rounded-2xl items-center mt-2 mb-6 border-b-4 border-freedom-accent"
+                  className="p-5 rounded-2xl items-center mt-2 mb-6"
+                  style={{
+                    backgroundColor: t.accentColor,
+                    borderBottomWidth: 4,
+                    borderBottomColor: t.accentColor,
+                  }}
                 >
-                  <Text className="text-white font-bold text-lg">
+                  <Text
+                    className="font-bold text-lg"
+                    style={{ color: t.textColor }}
+                  >
                     {pendingMode === siteControlMode
                       ? "Update Friction Settings"
                       : `Activate ${pendingMode.charAt(0).toUpperCase() + pendingMode.slice(1)} Mode`}

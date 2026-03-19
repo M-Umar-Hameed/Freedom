@@ -1,3 +1,4 @@
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import * as Crypto from "expo-crypto";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,7 @@ export function AppLockScreen({
   visible: boolean;
   onUnlock: () => void;
 }): ReactNode {
+  const t = useAppTheme();
   const { appLockType, appLockHash } = useAppStore();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -58,14 +60,23 @@ export function AppLockScreen({
 
   return (
     <Modal visible={visible} animationType="fade" statusBarTranslucent>
-      <View className="flex-1 bg-freedom-primary items-center justify-center px-8">
-        <View className="w-20 h-20 rounded-full bg-freedom-highlight/20 items-center justify-center mb-6">
-          <Ionicons name="lock-closed" size={40} color="#2DD4BF" />
+      <View
+        className="flex-1 items-center justify-center px-8"
+        style={{ backgroundColor: t.bgColor }}
+      >
+        <View
+          className="w-20 h-20 rounded-full items-center justify-center mb-6"
+          style={{ backgroundColor: t.accentColor + "33" }}
+        >
+          <Ionicons name="lock-closed" size={40} color={t.accentColor} />
         </View>
-        <Text className="text-white text-2xl font-bold mb-2">
+        <Text
+          className="text-2xl font-bold mb-2"
+          style={{ color: t.textColor }}
+        >
           LibreAscent is Locked
         </Text>
-        <Text className="text-freedom-text-muted text-center mb-8">
+        <Text className="text-center mb-8" style={{ color: t.mutedTextColor }}>
           {appLockType === "passkey"
             ? "Authenticate with your fingerprint to continue"
             : "Enter your password to continue"}
@@ -76,10 +87,14 @@ export function AppLockScreen({
             onPress={() => {
               void attemptBiometric();
             }}
-            className="bg-freedom-highlight/10 border-2 border-freedom-highlight p-5 rounded-2xl items-center w-full"
+            className="border-2 p-5 rounded-2xl items-center w-full"
+            style={{
+              backgroundColor: t.accentColor + "1A",
+              borderColor: t.accentColor,
+            }}
           >
-            <Ionicons name="finger-print" size={48} color="#2DD4BF" />
-            <Text className="text-freedom-highlight font-bold mt-3">
+            <Ionicons name="finger-print" size={48} color={t.accentColor} />
+            <Text className="font-bold mt-3" style={{ color: t.accentColor }}>
               Tap to Authenticate
             </Text>
           </Pressable>
@@ -98,18 +113,34 @@ export function AppLockScreen({
               onSubmitEditing={() => {
                 void handlePasswordSubmit();
               }}
-              className="bg-freedom-surface border-2 border-freedom-secondary p-4 rounded-xl text-white text-center text-lg mb-4"
+              className="border-2 p-4 rounded-xl text-center text-lg mb-4"
+              style={{
+                backgroundColor: t.cardBgColor,
+                borderColor: t.mutedTextColor + "33",
+                color: t.textColor,
+              }}
             />
             {error ? (
-              <Text className="text-red-500 text-center mb-4">{error}</Text>
+              <Text
+                className="text-center mb-4"
+                style={{ color: t.dangerColor }}
+              >
+                {error}
+              </Text>
             ) : null}
             <Pressable
               onPress={() => {
                 void handlePasswordSubmit();
               }}
-              className="bg-freedom-highlight p-4 rounded-xl items-center"
+              className="p-4 rounded-xl items-center"
+              style={{ backgroundColor: t.accentColor }}
             >
-              <Text className="text-white font-bold text-lg">Unlock</Text>
+              <Text
+                className="font-bold text-lg"
+                style={{ color: t.textColor }}
+              >
+                Unlock
+              </Text>
             </Pressable>
           </View>
         )}

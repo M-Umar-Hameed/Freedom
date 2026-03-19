@@ -1,4 +1,5 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import type { ScheduleEntry } from "@/types/blocking";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ScheduleScreen(): ReactNode {
   const router = useRouter();
+  const t = useAppTheme();
   const { schedule, setSchedule, controlMode } = useAppStore();
   const [pendingDay, setPendingDay] = useState<number | null>(null);
 
@@ -56,7 +58,8 @@ export default function ScheduleScreen(): ReactNode {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white dark:bg-freedom-primary"
+      className="flex-1"
+      style={{ backgroundColor: t.bgColor }}
       edges={["top"]}
     >
       <View className="flex-row items-center px-4 py-2">
@@ -66,29 +69,43 @@ export default function ScheduleScreen(): ReactNode {
           }}
           className="p-2 -ml-2"
         >
-          <Ionicons name="arrow-back" size={24} color="#2DD4BF" />
+          <Ionicons name="arrow-back" size={24} color={t.accentColor} />
         </Pressable>
-        <Text className="text-xl font-bold text-black dark:text-white ml-2">
+        <Text className="text-xl font-bold ml-2" style={{ color: t.textColor }}>
           Schedule
         </Text>
       </View>
 
       <ScrollView className="flex-1 px-4 pt-4">
-        <Text className="text-freedom-text-muted mb-6">
+        <Text className="mb-6" style={{ color: t.mutedTextColor }}>
           Set specific times for protection. If no schedule is set, protection
           is always active.
         </Text>
 
-        <View className="bg-gray-100 dark:bg-freedom-surface rounded-2xl overflow-hidden mb-6">
+        <View
+          className="rounded-2xl overflow-hidden mb-6"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
           {days.map((day, index) => {
             const entry = schedule.find((s) => s.day === index);
             return (
               <View
                 key={day}
-                className={`p-4 border-b border-gray-200 dark:border-freedom-secondary ${index === days.length - 1 ? "border-b-0" : ""}`}
+                className="p-4"
+                style={
+                  index !== days.length - 1
+                    ? {
+                        borderBottomWidth: 1,
+                        borderBottomColor: t.mutedTextColor + "33",
+                      }
+                    : undefined
+                }
               >
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-lg font-semibold text-black dark:text-white">
+                  <Text
+                    className="text-lg font-semibold"
+                    style={{ color: t.textColor }}
+                  >
                     {day}
                   </Text>
                   <Switch
@@ -96,27 +113,55 @@ export default function ScheduleScreen(): ReactNode {
                     onValueChange={(val) => {
                       handleTogglePress(index, val);
                     }}
-                    trackColor={{ false: "#ccc", true: "#2DD4BF" }}
+                    trackColor={{ false: "#ccc", true: t.accentColor }}
                     thumbColor={entry?.enabled ? "#fff" : "#999"}
                   />
                 </View>
 
                 {entry?.enabled && (
                   <View className="flex-row items-center mt-3 gap-4">
-                    <View className="flex-1 bg-white dark:bg-freedom-primary p-2 rounded-lg items-center border border-gray-200 dark:border-freedom-accent">
-                      <Text className="text-xs text-freedom-text-muted uppercase mb-1">
+                    <View
+                      className="flex-1 p-2 rounded-lg items-center border"
+                      style={{
+                        backgroundColor: t.bgColor,
+                        borderColor: t.mutedTextColor + "33",
+                      }}
+                    >
+                      <Text
+                        className="text-xs uppercase mb-1"
+                        style={{ color: t.mutedTextColor }}
+                      >
                         Start
                       </Text>
-                      <Text className="text-black dark:text-white font-bold">
+                      <Text
+                        className="font-bold"
+                        style={{ color: t.textColor }}
+                      >
                         {entry.startTime}
                       </Text>
                     </View>
-                    <Ionicons name="arrow-forward" size={20} color="#94A3B8" />
-                    <View className="flex-1 bg-white dark:bg-freedom-primary p-2 rounded-lg items-center border border-gray-200 dark:border-freedom-accent">
-                      <Text className="text-xs text-freedom-text-muted uppercase mb-1">
+                    <Ionicons
+                      name="arrow-forward"
+                      size={20}
+                      color={t.mutedTextColor}
+                    />
+                    <View
+                      className="flex-1 p-2 rounded-lg items-center border"
+                      style={{
+                        backgroundColor: t.bgColor,
+                        borderColor: t.mutedTextColor + "33",
+                      }}
+                    >
+                      <Text
+                        className="text-xs uppercase mb-1"
+                        style={{ color: t.mutedTextColor }}
+                      >
                         End
                       </Text>
-                      <Text className="text-black dark:text-white font-bold">
+                      <Text
+                        className="font-bold"
+                        style={{ color: t.textColor }}
+                      >
                         {entry.endTime}
                       </Text>
                     </View>
@@ -127,12 +172,17 @@ export default function ScheduleScreen(): ReactNode {
           })}
         </View>
 
-        <View className="bg-freedom-highlight/10 p-4 rounded-xl">
+        <View
+          className="p-4 rounded-xl"
+          style={{ backgroundColor: t.accentColor + "1A" }}
+        >
           <View className="flex-row items-center mb-2">
-            <Ionicons name="bulb" size={20} color="#2DD4BF" />
-            <Text className="ml-2 font-bold text-freedom-highlight">Tip</Text>
+            <Ionicons name="bulb" size={20} color={t.accentColor} />
+            <Text className="ml-2 font-bold" style={{ color: t.accentColor }}>
+              Tip
+            </Text>
           </View>
-          <Text className="text-black dark:text-white text-sm leading-5">
+          <Text className="text-sm leading-5" style={{ color: t.textColor }}>
             Overnight schedules (e.g., 10 PM to 6 AM) are fully supported. Use
             schedules to build a routine that works for you.
           </Text>

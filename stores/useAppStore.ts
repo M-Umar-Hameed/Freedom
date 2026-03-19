@@ -3,6 +3,7 @@ import {
   getTotalBlockedCount,
   sqliteStorage,
 } from "@/db/database";
+import type { AppTheme } from "@/constants/overlay-themes";
 import type {
   BlockingStats,
   ControlMode,
@@ -25,7 +26,15 @@ interface AppState {
   appLockEnabled: boolean;
   appLockType: "password" | "passkey" | null;
   appLockHash: string | null;
-  theme: "light" | "dark" | "system";
+  appThemeId: string;
+  customTheme: AppTheme | null;
+  overlayCustomImage: string | null;
+  overlayTexts: {
+    title: string;
+    subtitle: string;
+    heading: string;
+    body: string;
+  };
   controlMode: ControlMode;
   schedule: ScheduleEntry[];
   surveillance: SurveillanceConfig;
@@ -38,7 +47,10 @@ interface AppState {
   incrementBlocked: () => void;
   resetCleanStreak: () => void;
   setAutoStart: (value: boolean) => void;
-  setTheme: (theme: "light" | "dark" | "system") => void;
+  setAppThemeId: (id: string) => void;
+  setCustomTheme: (theme: AppTheme | null) => void;
+  setOverlayCustomImage: (path: string | null) => void;
+  setOverlayTexts: (texts: Partial<AppState["overlayTexts"]>) => void;
   setAppLockEnabled: (enabled: boolean) => void;
   setAppLockType: (type: "password" | "passkey" | null) => void;
   setAppLockHash: (hash: string | null) => void;
@@ -72,7 +84,15 @@ export const useAppStore = create<AppState>()(
       appLockEnabled: false,
       appLockType: null,
       appLockHash: null,
-      theme: "system",
+      appThemeId: "default",
+      customTheme: null,
+      overlayCustomImage: null,
+      overlayTexts: {
+        title: "Blocked!",
+        subtitle: "Stay Sharp - Stay Disciplined",
+        heading: "You are on a mission to build a better future!",
+        body: "Giving in to cheap dopamine is not an option. Back away right now, get back to the grind, and crush your goals today!",
+      },
       controlMode: "flexible",
       schedule: [],
       surveillance: { type: "none", value: 0, startHour: 0, endHour: 0 },
@@ -103,7 +123,13 @@ export const useAppStore = create<AppState>()(
         })),
 
       setAutoStart: (value) => set({ autoStartOnBoot: value }),
-      setTheme: (theme) => set({ theme }),
+      setAppThemeId: (id) => set({ appThemeId: id }),
+      setCustomTheme: (theme) => set({ customTheme: theme }),
+      setOverlayCustomImage: (path) => set({ overlayCustomImage: path }),
+      setOverlayTexts: (texts) =>
+        set((state) => ({
+          overlayTexts: { ...state.overlayTexts, ...texts },
+        })),
       setAppLockEnabled: (enabled) => set({ appLockEnabled: enabled }),
       setAppLockType: (type) => set({ appLockType: type }),
       setAppLockHash: (hash) => set({ appLockHash: hash }),

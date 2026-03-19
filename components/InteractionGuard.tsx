@@ -1,3 +1,4 @@
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import type { SurveillanceConfig } from "@/types/blocking";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,7 @@ export const InteractionGuard: React.FC<InteractionGuardProps> = ({
   actionName,
   surveillanceOverride,
 }) => {
+  const t = useAppTheme();
   const globalSurveillance = useAppStore((s) => s.surveillance);
   const surveillance = surveillanceOverride ?? globalSurveillance;
   const [timeLeft, setTimeLeft] = useState(surveillance.value);
@@ -71,7 +73,6 @@ export const InteractionGuard: React.FC<InteractionGuardProps> = ({
     const start = surveillance.startHour ?? 0;
     const end = surveillance.endHour ?? 0;
 
-    // If start == end, it means Always Locked (24 hours)
     if (start === end) return true;
 
     if (start < end) {
@@ -97,24 +98,42 @@ export const InteractionGuard: React.FC<InteractionGuardProps> = ({
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View className="flex-1 bg-black/60 items-center justify-center px-6">
-        <View className="bg-white dark:bg-freedom-surface w-full rounded-3xl p-6 items-center shadow-xl">
-          <View className="w-16 h-16 rounded-full bg-freedom-accent/20 items-center justify-center mb-4">
+        <View
+          className="w-full rounded-3xl p-6 items-center shadow-xl"
+          style={{ backgroundColor: t.cardBgColor }}
+        >
+          <View
+            className="w-16 h-16 rounded-full items-center justify-center mb-4"
+            style={{ backgroundColor: t.accentColor + "33" }}
+          >
             <Ionicons name="hand-right" size={32} color="#e94560" />
           </View>
 
-          <Text className="text-xl font-bold text-black dark:text-white text-center mb-2">
+          <Text
+            className="text-xl font-bold text-center mb-2"
+            style={{ color: t.textColor }}
+          >
             Patience Required
           </Text>
 
-          <Text className="text-freedom-text-muted text-center mb-8">
+          <Text
+            className="text-center mb-8"
+            style={{ color: t.mutedTextColor }}
+          >
             You are about to {actionName.toLowerCase()}. Take a moment to
             breathe and reflect on your goals.
           </Text>
 
           {surveillance.type === "timer" ? (
             <View className="items-center w-full">
-              <View className="w-24 h-24 rounded-full border-4 border-freedom-highlight items-center justify-center mb-6">
-                <Text className="text-3xl font-bold text-black dark:text-white">
+              <View
+                className="w-24 h-24 rounded-full border-4 items-center justify-center mb-6"
+                style={{ borderColor: t.accentColor }}
+              >
+                <Text
+                  className="text-3xl font-bold"
+                  style={{ color: t.textColor }}
+                >
                   {timeLeft}s
                 </Text>
               </View>
@@ -122,13 +141,16 @@ export const InteractionGuard: React.FC<InteractionGuardProps> = ({
               <Pressable
                 onPress={handleTimerComplete}
                 disabled={timeLeft > 0}
-                className={`w-full py-4 rounded-xl items-center mb-3 shadow-sm ${
-                  timeLeft > 0
-                    ? "bg-gray-200 dark:bg-freedom-accent opacity-60"
-                    : "bg-freedom-highlight"
-                }`}
+                className="w-full py-4 rounded-xl items-center mb-3 shadow-sm"
+                style={{
+                  backgroundColor: timeLeft > 0 ? t.accentColor : t.accentColor,
+                  opacity: timeLeft > 0 ? 0.6 : 1,
+                }}
               >
-                <Text className="text-white font-bold text-lg">
+                <Text
+                  className="font-bold text-lg"
+                  style={{ color: t.textColor }}
+                >
                   {timeLeft > 0 ? "Please Wait..." : "Confirm Action"}
                 </Text>
               </Pressable>
@@ -137,35 +159,63 @@ export const InteractionGuard: React.FC<InteractionGuardProps> = ({
             <View className="items-center w-full">
               <Pressable
                 onPress={handleClick}
-                className="w-32 h-32 rounded-full bg-freedom-highlight items-center justify-center mb-6 active:scale-90 shadow-lg border-b-4 border-freedom-accent"
+                className="w-32 h-32 rounded-full items-center justify-center mb-6 active:scale-90 shadow-lg border-b-4"
+                style={{
+                  backgroundColor: t.accentColor,
+                  borderColor: t.accentColor,
+                }}
               >
-                <Text className="text-white text-4xl font-bold">
+                <Text
+                  className="text-4xl font-bold"
+                  style={{ color: t.textColor }}
+                >
                   {surveillance.value - clickCount}
                 </Text>
-                <Text className="text-white/80 text-xs font-bold uppercase">
+                <Text
+                  className="text-xs font-bold uppercase"
+                  style={{ color: t.textColor + "CC" }}
+                >
                   Taps Left
                 </Text>
               </Pressable>
 
-              <Text className="text-freedom-text-muted text-sm mb-6 flex-row items-center">
+              <Text
+                className="text-sm mb-6 flex-row items-center"
+                style={{ color: t.mutedTextColor }}
+              >
                 Tap to bypass the lock
               </Text>
             </View>
           ) : surveillance.type === "time" ? (
             <View className="items-center w-full">
-              <View className="w-full bg-gray-100 dark:bg-black/20 p-6 rounded-2xl items-center mb-6 border border-freedom-highlight/20">
+              <View
+                className="w-full p-6 rounded-2xl items-center mb-6 border"
+                style={{
+                  backgroundColor: t.bgColor + "33",
+                  borderColor: t.accentColor + "33",
+                }}
+              >
                 <Ionicons
                   name="lock-closed-outline"
                   size={48}
                   color="#e94560"
                 />
-                <Text className="text-2xl font-bold text-black dark:text-white mt-4">
+                <Text
+                  className="text-2xl font-bold mt-4"
+                  style={{ color: t.textColor }}
+                >
                   Lockout Active
                 </Text>
-                <Text className="text-xl font-semibold text-freedom-highlight mt-1">
+                <Text
+                  className="text-xl font-semibold mt-1"
+                  style={{ color: t.accentColor }}
+                >
                   {lockIntervalStr}
                 </Text>
-                <Text className="text-freedom-text-muted text-center mt-4">
+                <Text
+                  className="text-center mt-4"
+                  style={{ color: t.mutedTextColor }}
+                >
                   Settings are strictly locked during this window to preserve
                   your focus. Try again outside this interval.
                 </Text>
@@ -174,13 +224,18 @@ export const InteractionGuard: React.FC<InteractionGuardProps> = ({
               <Pressable
                 onPress={onSuccess}
                 disabled={activeTimeLock}
-                className={`w-full py-4 rounded-xl items-center mb-3 shadow-sm ${
-                  activeTimeLock
-                    ? "bg-gray-300 dark:bg-freedom-accent opacity-50"
-                    : "bg-freedom-highlight"
-                }`}
+                className="w-full py-4 rounded-xl items-center mb-3 shadow-sm"
+                style={{
+                  backgroundColor: activeTimeLock
+                    ? t.accentColor
+                    : t.accentColor,
+                  opacity: activeTimeLock ? 0.5 : 1,
+                }}
               >
-                <Text className="text-white font-bold text-lg">
+                <Text
+                  className="font-bold text-lg"
+                  style={{ color: t.textColor }}
+                >
                   {activeTimeLock ? "Currently Restricted" : "Confirm Action"}
                 </Text>
               </Pressable>
@@ -188,7 +243,9 @@ export const InteractionGuard: React.FC<InteractionGuardProps> = ({
           ) : null}
 
           <Pressable onPress={onCancel} className="mt-2 p-2">
-            <Text className="text-freedom-highlight font-semibold">Cancel</Text>
+            <Text className="font-semibold" style={{ color: t.accentColor }}>
+              Cancel
+            </Text>
           </Pressable>
         </View>
       </View>

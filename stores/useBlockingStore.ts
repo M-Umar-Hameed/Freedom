@@ -90,20 +90,6 @@ export const DEFAULT_SOURCES: BlocklistSource[] = [
     format: "domains",
     enabled: true,
   },
-  {
-    id: "porn-blocklist",
-    name: "Porn Blocklist",
-    url: "https://raw.githubusercontent.com/M-Umar-Hameed/LibreAscent/main/assets/blocklistsource/porn-blocklist.txt",
-    format: "domains",
-    enabled: true,
-  },
-  {
-    id: "hentai-blocklist",
-    name: "Hentai Blocklist",
-    url: "https://raw.githubusercontent.com/M-Umar-Hameed/LibreAscent/main/assets/blocklistsource/hentai-blocklist.txt",
-    format: "domains",
-    enabled: true,
-  },
 ];
 
 export const useBlockingStore = create<BlockingState>()(

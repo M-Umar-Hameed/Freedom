@@ -6,6 +6,7 @@ interface FreedomOverlayModuleInterface {
   hasOverlayPermission(): Promise<boolean>;
   requestOverlayPermission(): Promise<void>;
   isOverlayShowing(): Promise<boolean>;
+  updateOverlayTheme(themeJson: string): Promise<void>;
 }
 
 let FreedomOverlayNative: FreedomOverlayModuleInterface | null = null;
@@ -45,4 +46,9 @@ export async function requestOverlayPermission(): Promise<void> {
 export async function isOverlayShowing(): Promise<boolean> {
   if (!FreedomOverlayNative) return false;
   return FreedomOverlayNative.isOverlayShowing();
+}
+
+export async function updateOverlayTheme(themeJson: string): Promise<void> {
+  if (!FreedomOverlayNative) return;
+  return FreedomOverlayNative.updateOverlayTheme(themeJson);
 }

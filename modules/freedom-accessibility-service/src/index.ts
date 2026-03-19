@@ -45,6 +45,7 @@ interface FreedomAccessibilityModuleInterface {
   getInstalledApps(): Promise<
     { name: string; packageName: string; icon?: string }[]
   >;
+  updateOverlayTheme(themeJson: string): Promise<void>;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 }
@@ -189,6 +190,11 @@ export async function getInstalledApps(): Promise<
   return FreedomAccessibilityNative.getInstalledApps();
 }
 
+export async function updateOverlayTheme(themeJson: string): Promise<void> {
+  if (!FreedomAccessibilityNative) return;
+  return FreedomAccessibilityNative.updateOverlayTheme(themeJson);
+}
+
 // Event: URL blocked in a browser
 export function onUrlBlocked(
   listener: (event: {
@@ -206,10 +212,11 @@ export function onUrlBlocked(
       },
     };
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const emitter: any = new ExpoEventEmitter(
       FreedomAccessibilityNative as any,
     );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     return emitter.addListener("onUrlBlocked", listener);
   } catch {
     return {
@@ -236,10 +243,11 @@ export function onReelsDetected(
       },
     };
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const emitter: any = new ExpoEventEmitter(
       FreedomAccessibilityNative as any,
     );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     return emitter.addListener("onReelsDetected", listener);
   } catch {
     return {

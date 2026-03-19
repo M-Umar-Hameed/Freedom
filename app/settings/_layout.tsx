@@ -8,6 +8,8 @@ export default function SettingsLayout(): ReactNode {
       <Stack.Screen name="control-modes" />
       <Stack.Screen name="schedule" />
       <Stack.Screen name="update-sources" />
+      <Stack.Screen name="overlay-theme" />
+      <Stack.Screen name="custom-theme" />
     </Stack>
   );
 }

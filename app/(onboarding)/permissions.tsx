@@ -1,5 +1,6 @@
 import type { PermissionStatus } from "@/hooks/usePermissions";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -22,6 +23,7 @@ function ProgressBar({
   granted: number;
   total: number;
 }): ReactNode {
+  const t = useAppTheme();
   const progress = total > 0 ? granted / total : 0;
   const animatedWidth = useRef(new Animated.Value(0)).current;
 
@@ -37,17 +39,21 @@ function ProgressBar({
   return (
     <View className="mb-6">
       <View className="flex-row justify-between mb-2">
-        <Text className="text-freedom-text-muted text-sm">
+        <Text className="text-sm" style={{ color: t.mutedTextColor }}>
           Permissions granted
         </Text>
-        <Text className="text-white text-sm font-semibold">
+        <Text className="text-sm font-semibold" style={{ color: t.textColor }}>
           {granted}/{total}
         </Text>
       </View>
-      <View className="h-2 bg-freedom-secondary rounded-full overflow-hidden">
+      <View
+        className="h-2 rounded-full overflow-hidden"
+        style={{ backgroundColor: t.mutedTextColor + "33" }}
+      >
         <Animated.View
-          className="h-full bg-freedom-success rounded-full"
+          className="h-full rounded-full"
           style={{
+            backgroundColor: t.successColor,
             width: animatedWidth.interpolate({
               inputRange: [0, 1],
               outputRange: ["0%", "100%"],
@@ -68,6 +74,7 @@ function PermissionCard({
   onPress: () => void;
   stepNumber: number;
 }): ReactNode {
+  const t = useAppTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback((): void => {
@@ -96,33 +103,41 @@ function PermissionCard({
         onPressOut={!permission.granted ? handlePressOut : undefined}
         disabled={permission.loading}
         aria-label={`Grant ${permission.title} permission`}
-        className={`rounded-2xl p-5 mb-3 ${
-          permission.granted
-            ? "bg-freedom-success/10 border border-freedom-success/30"
-            : "bg-freedom-surface border border-freedom-accent/20"
-        }`}
-        style={{ minHeight: 80 }}
+        className="rounded-2xl p-5 mb-3 border"
+        style={{
+          backgroundColor: permission.granted
+            ? t.successColor + "1A"
+            : t.cardBgColor,
+          borderColor: permission.granted
+            ? t.successColor + "4D"
+            : t.accentColor + "33",
+          minHeight: 80,
+        }}
       >
         <View className="flex-row items-center">
-          {/* Step number / status icon */}
           <View className="w-10 h-10 items-center justify-center mr-4">
             {permission.loading ? (
               <ActivityIndicator
-                color={permission.granted ? "#10B981" : "#2DD4BF"}
+                color={permission.granted ? "#10B981" : t.accentColor}
                 size="small"
               />
             ) : permission.granted ? (
               <Ionicons name="checkmark-circle" size={32} color="#10B981" />
             ) : (
-              <View className="w-8 h-8 rounded-full border-2 border-freedom-accent items-center justify-center">
-                <Text className="text-freedom-accent font-bold text-sm">
+              <View
+                className="w-8 h-8 rounded-full border-2 items-center justify-center"
+                style={{ borderColor: t.accentColor }}
+              >
+                <Text
+                  className="font-bold text-sm"
+                  style={{ color: t.accentColor }}
+                >
                   {stepNumber}
                 </Text>
               </View>
             )}
           </View>
 
-          {/* Content */}
           <View className="flex-1">
             <View className="flex-row items-center mb-1">
               <Ionicons
@@ -132,30 +147,44 @@ function PermissionCard({
                 style={{ marginRight: 6 }}
               />
               <Text
-                className={`font-semibold ${
-                  permission.granted ? "text-freedom-success" : "text-white"
-                }`}
+                className="font-semibold"
+                style={{
+                  color: permission.granted ? t.successColor : t.textColor,
+                }}
               >
                 {permission.title}
               </Text>
               {!permission.required && (
-                <View className="ml-2 px-2 py-0.5 bg-freedom-accent/30 rounded-full">
-                  <Text className="text-freedom-text-muted text-xs">
+                <View
+                  className="ml-2 px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: t.accentColor + "4D" }}
+                >
+                  <Text className="text-xs" style={{ color: t.mutedTextColor }}>
                     Optional
                   </Text>
                 </View>
               )}
             </View>
-            <Text className="text-freedom-text-muted text-sm leading-5">
+            <Text
+              className="text-sm leading-5"
+              style={{ color: t.mutedTextColor }}
+            >
               {permission.description}
             </Text>
           </View>
 
-          {/* Action indicator */}
           {!permission.granted && !permission.loading && (
             <View className="ml-2">
-              <View className="bg-freedom-highlight rounded-lg px-3 py-2">
-                <Text className="text-white text-xs font-semibold">Grant</Text>
+              <View
+                className="rounded-lg px-3 py-2"
+                style={{ backgroundColor: t.accentColor }}
+              >
+                <Text
+                  className="text-xs font-semibold"
+                  style={{ color: t.textColor }}
+                >
+                  Grant
+                </Text>
               </View>
             </View>
           )}
@@ -166,6 +195,7 @@ function PermissionCard({
 }
 
 export default function PermissionsScreen(): ReactNode {
+  const t = useAppTheme();
   const {
     permissions,
     allGranted,
@@ -190,28 +220,31 @@ export default function PermissionsScreen(): ReactNode {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-freedom-primary">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: t.bgColor }}>
       <ScrollView
         className="flex-1 px-5 pt-6"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View className="mb-2">
-          <Text className="text-3xl font-bold text-white mb-2">
+          <Text
+            className="text-3xl font-bold mb-2"
+            style={{ color: t.textColor }}
+          >
             Setup Permissions
           </Text>
-          <Text className="text-freedom-text-muted text-base leading-6">
+          <Text
+            className="text-base leading-6"
+            style={{ color: t.mutedTextColor }}
+          >
             LibreAscent needs these permissions to protect you. Tap each one to
             grant access.
           </Text>
         </View>
 
-        {/* Progress */}
         <View className="mt-4">
           <ProgressBar granted={grantedCount} total={totalCount} />
         </View>
 
-        {/* Permission Cards */}
         <View className="mb-6">
           {permissions.map((permission, index) => (
             <PermissionCard
@@ -223,33 +256,40 @@ export default function PermissionsScreen(): ReactNode {
           ))}
         </View>
 
-        {/* Privacy notice */}
-        <View className="bg-freedom-secondary/60 rounded-2xl p-4 mb-6 flex-row border border-freedom-accent/10">
+        <View
+          className="rounded-2xl p-4 mb-6 flex-row border"
+          style={{
+            backgroundColor: t.cardBgColor + "99",
+            borderColor: t.accentColor + "1A",
+          }}
+        >
           <Ionicons
             name="shield-checkmark"
             size={20}
             color="#10B981"
             style={{ marginTop: 2 }}
           />
-          <Text className="text-freedom-text-muted ml-3 flex-1 text-sm leading-5">
+          <Text
+            className="ml-3 flex-1 text-sm leading-5"
+            style={{ color: t.mutedTextColor }}
+          >
             All data stays on your device. LibreAscent does not collect,
             transmit, or store any browsing data. The app is fully open source.
           </Text>
         </View>
 
-        {/* Action buttons */}
         <View className="gap-3 mb-8">
-          {/* Primary: Start Protection */}
           <Pressable
             onPress={handleContinue}
             aria-label="Continue to dashboard"
-            className={`w-full py-4 rounded-2xl items-center ${
-              allGranted
-                ? "bg-freedom-success"
+            className="w-full py-4 rounded-2xl items-center"
+            style={{
+              backgroundColor: allGranted
+                ? t.successColor
                 : requiredGranted
-                  ? "bg-freedom-highlight"
-                  : "bg-freedom-accent/60"
-            }`}
+                  ? t.accentColor
+                  : t.accentColor + "99",
+            }}
           >
             <View className="flex-row items-center gap-2">
               <Ionicons
@@ -257,7 +297,10 @@ export default function PermissionsScreen(): ReactNode {
                 size={20}
                 color="white"
               />
-              <Text className="text-white text-lg font-semibold">
+              <Text
+                className="text-lg font-semibold"
+                style={{ color: t.textColor }}
+              >
                 {allGranted
                   ? "Start Full Protection"
                   : requiredGranted
@@ -267,12 +310,14 @@ export default function PermissionsScreen(): ReactNode {
             </View>
           </Pressable>
 
-          {/* Warning if skipping */}
           {!allGranted && (
-            <Text className="text-freedom-warning text-xs text-center">
+            <Text
+              className="text-xs text-center"
+              style={{ color: t.warningColor }}
+            >
               {!requiredGranted
-                ? "⚠️ Core protection requires VPN, Accessibility, and Overlay permissions"
-                : "⚠️ Device Admin is recommended to prevent accidental uninstallation"}
+                ? "Core protection requires VPN, Accessibility, and Overlay permissions"
+                : "Device Admin is recommended to prevent accidental uninstallation"}
             </Text>
           )}
         </View>

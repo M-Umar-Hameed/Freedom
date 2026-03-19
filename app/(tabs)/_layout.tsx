@@ -1,3 +1,4 @@
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
@@ -6,16 +7,18 @@ import type { ReactNode } from "react";
 import { Platform, Pressable } from "react-native";
 
 export default function TabLayout(): ReactNode {
+  const t = useAppTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#2DD4BF",
-        tabBarInactiveTintColor: "#94A3B8",
+        tabBarActiveTintColor: t.accentColor,
+        tabBarInactiveTintColor: t.mutedTextColor,
         freezeOnBlur: false,
         tabBarStyle: {
-          backgroundColor: "#0B1215",
-          borderTopColor: "#1A2421",
+          backgroundColor: t.bgColor,
+          borderTopColor: t.cardBgColor,
           height: Platform.OS === "ios" ? 88 : 65,
           paddingBottom: Platform.OS === "ios" ? 30 : 10,
           borderTopWidth: 0,

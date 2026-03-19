@@ -1,6 +1,7 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
 import { BlocklistService } from "@/services/BlocklistService";
 import { ProtectionService } from "@/services/ProtectionService";
+import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
 import type { ControlMode, SurveillanceConfig } from "@/types/blocking";
@@ -50,6 +51,7 @@ const CONTROL_MODES: {
 ];
 
 export default function BlockAdultScreen(): ReactNode {
+  const t = useAppTheme();
   const {
     adultBlockingEnabled,
     setAdultBlockingEnabled,
@@ -196,7 +198,8 @@ export default function BlockAdultScreen(): ReactNode {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white dark:bg-freedom-primary"
+      className="flex-1"
+      style={{ backgroundColor: t.bgColor }}
       edges={["top"]}
     >
       <ScrollView
@@ -205,7 +208,7 @@ export default function BlockAdultScreen(): ReactNode {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-2xl font-bold text-black dark:text-white">
+          <Text className="text-2xl font-bold" style={{ color: t.textColor }}>
             Block Adult Content
           </Text>
           <Pressable
@@ -214,7 +217,8 @@ export default function BlockAdultScreen(): ReactNode {
               setPendingSurveillance(adultSurveillance);
               setShowModeModal(true);
             }}
-            className="flex-row items-center bg-gray-100 dark:bg-freedom-surface px-3 py-2 rounded-xl"
+            className="flex-row items-center px-3 py-2 rounded-xl"
+            style={{ backgroundColor: t.cardBgColor }}
           >
             <Ionicons
               name={
@@ -233,7 +237,7 @@ export default function BlockAdultScreen(): ReactNode {
             </Text>
           </Pressable>
         </View>
-        <Text className="text-freedom-text-muted mb-6">
+        <Text className="mb-6" style={{ color: t.mutedTextColor }}>
           Protect yourself from adult content across all sources
         </Text>
 
@@ -242,20 +246,24 @@ export default function BlockAdultScreen(): ReactNode {
           onPress={() => {
             if (!isSyncing) handleMasterToggle(!adultBlockingEnabled);
           }}
-          className={`rounded-2xl p-5 mb-4 border-2 ${
-            adultBlockingEnabled
-              ? "bg-freedom-highlight/10 border-freedom-highlight"
-              : "bg-gray-100 dark:bg-freedom-surface border-transparent"
-          }`}
+          className="rounded-2xl p-5 mb-4"
+          style={{
+            borderWidth: 2,
+            backgroundColor: adultBlockingEnabled
+              ? t.accentColor + "1A"
+              : t.cardBgColor,
+            borderColor: adultBlockingEnabled ? t.accentColor : "transparent",
+          }}
         >
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center flex-1">
               <View
-                className={`w-14 h-14 rounded-2xl items-center justify-center ${
-                  adultBlockingEnabled
-                    ? "bg-freedom-highlight"
-                    : "bg-gray-300 dark:bg-freedom-accent"
-                }`}
+                className="w-14 h-14 rounded-2xl items-center justify-center"
+                style={{
+                  backgroundColor: adultBlockingEnabled
+                    ? t.accentColor
+                    : t.cardBgColor,
+                }}
               >
                 {isSyncing ? (
                   <ActivityIndicator color="white" size="small" />
@@ -272,14 +280,17 @@ export default function BlockAdultScreen(): ReactNode {
                 )}
               </View>
               <View className="ml-4 flex-1">
-                <Text className="text-lg font-bold text-black dark:text-white">
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: t.textColor }}
+                >
                   {isSyncing
                     ? "Syncing..."
                     : adultBlockingEnabled
                       ? "Protection Active"
                       : "Protection Off"}
                 </Text>
-                <Text className="text-freedom-text-muted text-sm">
+                <Text className="text-sm" style={{ color: t.mutedTextColor }}>
                   {adultBlockingEnabled
                     ? `Blocking ${totalDomains.toLocaleString()} domains`
                     : "Tap to enable adult content blocking"}
@@ -287,9 +298,12 @@ export default function BlockAdultScreen(): ReactNode {
               </View>
             </View>
             <View
-              className={`w-14 h-8 rounded-full px-1 justify-center ${
-                adultBlockingEnabled ? "bg-freedom-highlight" : "bg-gray-400"
-              }`}
+              className="w-14 h-8 rounded-full px-1 justify-center"
+              style={{
+                backgroundColor: adultBlockingEnabled
+                  ? t.accentColor
+                  : "#9CA3AF",
+              }}
             >
               <View
                 className={`w-6 h-6 rounded-full bg-white ${
@@ -304,18 +318,17 @@ export default function BlockAdultScreen(): ReactNode {
         <Pressable
           disabled={isUpdating}
           onPress={handleUpdatePress}
-          className={`rounded-xl p-4 flex-row items-center justify-center mb-8 ${
-            isUpdating
-              ? "bg-gray-200 dark:bg-freedom-surface"
-              : "bg-freedom-accent"
-          }`}
+          className="rounded-xl p-4 flex-row items-center justify-center mb-8"
+          style={{
+            backgroundColor: isUpdating ? t.cardBgColor : t.accentColor,
+          }}
         >
           {isUpdating ? (
             <ActivityIndicator color="white" size="small" />
           ) : (
             <Ionicons name="cloud-download-outline" size={20} color="white" />
           )}
-          <Text className="text-white font-semibold ml-2">
+          <Text className="font-semibold ml-2" style={{ color: t.textColor }}>
             {isUpdating ? "Updating Blocklists..." : "Update Blocklists"}
           </Text>
         </Pressable>
@@ -326,21 +339,28 @@ export default function BlockAdultScreen(): ReactNode {
       {/* Control Mode Modal */}
       <Modal visible={showModeModal} animationType="slide" transparent>
         <View className="flex-1 bg-black/60 pt-20">
-          <View className="flex-1 bg-white dark:bg-freedom-primary rounded-t-[40px] p-6">
+          <View
+            className="flex-1 rounded-t-[40px] p-6"
+            style={{ backgroundColor: t.bgColor }}
+          >
             <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-xl font-bold text-black dark:text-white">
+              <Text
+                className="text-xl font-bold"
+                style={{ color: t.textColor }}
+              >
                 Adult Blocking Control
               </Text>
               <Pressable
                 onPress={() => {
                   setShowModeModal(false);
                 }}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                className="w-10 h-10 rounded-full items-center justify-center"
+                style={{ backgroundColor: t.cardBgColor }}
               >
-                <Ionicons name="close" size={24} color="#94A3B8" />
+                <Ionicons name="close" size={24} color={t.mutedTextColor} />
               </Pressable>
             </View>
-            <Text className="text-freedom-text-muted text-sm mb-6">
+            <Text className="text-sm mb-6" style={{ color: t.mutedTextColor }}>
               Controls friction for disabling adult content blocking. Works
               under the main control mode.
             </Text>
@@ -352,11 +372,16 @@ export default function BlockAdultScreen(): ReactNode {
                   onPress={() => {
                     handleSelectMode(mode.id);
                   }}
-                  className={`p-4 rounded-2xl mb-3 border-2 ${
-                    pendingMode === mode.id
-                      ? "bg-freedom-highlight/5 border-freedom-highlight"
-                      : "bg-gray-100 dark:bg-freedom-surface border-transparent"
-                  }`}
+                  className="p-4 rounded-2xl mb-3"
+                  style={{
+                    borderWidth: 2,
+                    backgroundColor:
+                      pendingMode === mode.id
+                        ? t.accentColor + "0D"
+                        : t.cardBgColor,
+                    borderColor:
+                      pendingMode === mode.id ? t.accentColor : "transparent",
+                  }}
                 >
                   <View className="flex-row items-start">
                     <View
@@ -373,18 +398,24 @@ export default function BlockAdultScreen(): ReactNode {
                     </View>
                     <View className="flex-1 ml-3">
                       <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-bold text-black dark:text-white">
+                        <Text
+                          className="text-base font-bold"
+                          style={{ color: t.textColor }}
+                        >
                           {mode.title}
                         </Text>
                         {pendingMode === mode.id && (
                           <Ionicons
                             name="checkmark-circle"
                             size={22}
-                            color="#2DD4BF"
+                            color={t.accentColor}
                           />
                         )}
                       </View>
-                      <Text className="text-freedom-text-muted text-sm mt-0.5">
+                      <Text
+                        className="text-sm mt-0.5"
+                        style={{ color: t.mutedTextColor }}
+                      >
                         {mode.description}
                       </Text>
                     </View>
@@ -395,7 +426,10 @@ export default function BlockAdultScreen(): ReactNode {
               {/* Friction Setup */}
               {(pendingMode === "locked" || pendingMode === "hardcore") && (
                 <View className="mt-2 mb-4">
-                  <View className="bg-gray-100 dark:bg-freedom-surface rounded-2xl p-5">
+                  <View
+                    className="rounded-2xl p-5"
+                    style={{ backgroundColor: t.cardBgColor }}
+                  >
                     <View className="flex-row gap-3 mb-6">
                       {(["timer", "click", "time"] as const).map((type) => (
                         <Pressable
@@ -414,11 +448,18 @@ export default function BlockAdultScreen(): ReactNode {
                                 : {}),
                             });
                           }}
-                          className={`flex-1 p-4 rounded-xl items-center border-2 ${
-                            pendingSurveillance.type === type
-                              ? "bg-freedom-highlight/10 border-freedom-highlight"
-                              : "bg-white dark:bg-freedom-primary border-transparent"
-                          }`}
+                          className="flex-1 p-4 rounded-xl items-center"
+                          style={{
+                            borderWidth: 2,
+                            backgroundColor:
+                              pendingSurveillance.type === type
+                                ? t.accentColor + "1A"
+                                : t.bgColor,
+                            borderColor:
+                              pendingSurveillance.type === type
+                                ? t.accentColor
+                                : "transparent",
+                          }}
                         >
                           <Ionicons
                             name={
@@ -433,16 +474,18 @@ export default function BlockAdultScreen(): ReactNode {
                             size={24}
                             color={
                               pendingSurveillance.type === type
-                                ? "#2DD4BF"
-                                : "#94A3B8"
+                                ? t.accentColor
+                                : t.mutedTextColor
                             }
                           />
                           <Text
-                            className={`font-bold mt-1 ${
-                              pendingSurveillance.type === type
-                                ? "text-freedom-highlight"
-                                : "text-freedom-text-muted"
-                            }`}
+                            className="font-bold mt-1"
+                            style={{
+                              color:
+                                pendingSurveillance.type === type
+                                  ? t.accentColor
+                                  : t.mutedTextColor,
+                            }}
                           >
                             {type === "timer"
                               ? "Timer"
@@ -455,7 +498,14 @@ export default function BlockAdultScreen(): ReactNode {
                     </View>
 
                     {pendingSurveillance.type === "time" ? (
-                      <View className="bg-white dark:bg-freedom-primary p-4 rounded-xl border border-gray-200 dark:border-freedom-secondary">
+                      <View
+                        className="p-4 rounded-xl"
+                        style={{
+                          backgroundColor: t.bgColor,
+                          borderWidth: 1,
+                          borderColor: t.mutedTextColor + "33",
+                        }}
+                      >
                         {[
                           {
                             label: "Start",
@@ -468,7 +518,10 @@ export default function BlockAdultScreen(): ReactNode {
                             key={key}
                             className="flex-row items-center justify-between mb-2"
                           >
-                            <Text className="text-freedom-text-muted font-bold">
+                            <Text
+                              className="font-bold"
+                              style={{ color: t.mutedTextColor }}
+                            >
                               {label}
                             </Text>
                             <View className="flex-row items-center gap-4">
@@ -483,7 +536,8 @@ export default function BlockAdultScreen(): ReactNode {
                                       24,
                                   });
                                 }}
-                                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                                className="w-10 h-10 rounded-full items-center justify-center"
+                                style={{ backgroundColor: t.cardBgColor }}
                               >
                                 <Ionicons
                                   name="remove"
@@ -491,7 +545,10 @@ export default function BlockAdultScreen(): ReactNode {
                                   color="#EF4444"
                                 />
                               </Pressable>
-                              <Text className="text-xl font-bold text-black dark:text-white w-20 text-center">
+                              <Text
+                                className="text-xl font-bold w-20 text-center"
+                                style={{ color: t.textColor }}
+                              >
                                 {formatHour(pendingSurveillance[key] ?? def)}
                               </Text>
                               <Pressable
@@ -503,7 +560,8 @@ export default function BlockAdultScreen(): ReactNode {
                                       24,
                                   });
                                 }}
-                                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                                className="w-10 h-10 rounded-full items-center justify-center"
+                                style={{ backgroundColor: t.cardBgColor }}
                               >
                                 <Ionicons
                                   name="add"
@@ -516,7 +574,14 @@ export default function BlockAdultScreen(): ReactNode {
                         ))}
                       </View>
                     ) : (
-                      <View className="flex-row items-center justify-between bg-white dark:bg-freedom-primary p-4 rounded-xl border border-gray-200 dark:border-freedom-secondary">
+                      <View
+                        className="flex-row items-center justify-between p-4 rounded-xl"
+                        style={{
+                          backgroundColor: t.bgColor,
+                          borderWidth: 1,
+                          borderColor: t.mutedTextColor + "33",
+                        }}
+                      >
                         <Pressable
                           onPress={() => {
                             const step =
@@ -531,15 +596,26 @@ export default function BlockAdultScreen(): ReactNode {
                               ),
                             });
                           }}
-                          className="w-12 h-12 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                          className="w-12 h-12 rounded-full items-center justify-center"
+                          style={{ backgroundColor: t.cardBgColor }}
                         >
-                          <Ionicons name="remove" size={28} color="#2DD4BF" />
+                          <Ionicons
+                            name="remove"
+                            size={28}
+                            color={t.accentColor}
+                          />
                         </Pressable>
                         <View className="items-center">
-                          <Text className="text-3xl font-bold text-black dark:text-white">
+                          <Text
+                            className="text-3xl font-bold"
+                            style={{ color: t.textColor }}
+                          >
                             {pendingSurveillance.value}
                           </Text>
-                          <Text className="text-freedom-text-muted text-xs font-semibold uppercase">
+                          <Text
+                            className="text-xs font-semibold uppercase"
+                            style={{ color: t.mutedTextColor }}
+                          >
                             {pendingSurveillance.type === "timer"
                               ? "Seconds"
                               : "Taps"}
@@ -557,9 +633,14 @@ export default function BlockAdultScreen(): ReactNode {
                               ),
                             });
                           }}
-                          className="w-12 h-12 rounded-full bg-gray-100 dark:bg-freedom-surface items-center justify-center"
+                          className="w-12 h-12 rounded-full items-center justify-center"
+                          style={{ backgroundColor: t.cardBgColor }}
                         >
-                          <Ionicons name="add" size={28} color="#2DD4BF" />
+                          <Ionicons
+                            name="add"
+                            size={28}
+                            color={t.accentColor}
+                          />
                         </Pressable>
                       </View>
                     )}
@@ -570,9 +651,17 @@ export default function BlockAdultScreen(): ReactNode {
               {isModeChanged && (
                 <Pressable
                   onPress={handleSaveMode}
-                  className="bg-freedom-highlight p-5 rounded-2xl items-center mt-2 mb-6 border-b-4 border-freedom-accent"
+                  className="p-5 rounded-2xl items-center mt-2 mb-6"
+                  style={{
+                    backgroundColor: t.accentColor,
+                    borderBottomWidth: 4,
+                    borderBottomColor: t.accentColor,
+                  }}
                 >
-                  <Text className="text-white font-bold text-lg">
+                  <Text
+                    className="font-bold text-lg"
+                    style={{ color: t.textColor }}
+                  >
                     {pendingMode === adultControlMode
                       ? "Update Friction Settings"
                       : `Activate ${pendingMode.charAt(0).toUpperCase() + pendingMode.slice(1)} Mode`}
@@ -589,13 +678,22 @@ export default function BlockAdultScreen(): ReactNode {
       {/* Alert Modal */}
       <Modal visible={alertModal.visible} transparent animationType="fade">
         <View className="flex-1 bg-black/60 items-center justify-center px-6">
-          <View className="bg-white dark:bg-freedom-surface w-full rounded-3xl p-6 items-center border border-freedom-highlight/20">
+          <View
+            className="w-full rounded-3xl p-6 items-center"
+            style={{
+              backgroundColor: t.cardBgColor,
+              borderWidth: 1,
+              borderColor: t.accentColor + "33",
+            }}
+          >
             <View
-              className={`w-16 h-16 rounded-full items-center justify-center mb-4 ${
-                alertModal.type === "success"
-                  ? "bg-freedom-success/20"
-                  : "bg-freedom-danger/20"
-              }`}
+              className="w-16 h-16 rounded-full items-center justify-center mb-4"
+              style={{
+                backgroundColor:
+                  alertModal.type === "success"
+                    ? t.successColor + "33"
+                    : t.dangerColor + "33",
+              }}
             >
               <Ionicons
                 name={
@@ -604,26 +702,39 @@ export default function BlockAdultScreen(): ReactNode {
                     : "alert-circle"
                 }
                 size={36}
-                color={alertModal.type === "success" ? "#10B981" : "#EF4444"}
+                color={
+                  alertModal.type === "success" ? t.successColor : t.dangerColor
+                }
               />
             </View>
-            <Text className="text-xl font-bold text-black dark:text-white text-center mb-2">
+            <Text
+              className="text-xl font-bold text-center mb-2"
+              style={{ color: t.textColor }}
+            >
               {alertModal.title}
             </Text>
-            <Text className="text-freedom-text-muted text-center mb-6">
+            <Text
+              className="text-center mb-6"
+              style={{ color: t.mutedTextColor }}
+            >
               {alertModal.message}
             </Text>
             <Pressable
               onPress={() => {
                 setAlertModal((prev) => ({ ...prev, visible: false }));
               }}
-              className={`w-full py-4 rounded-xl items-center ${
-                alertModal.type === "success"
-                  ? "bg-freedom-highlight"
-                  : "bg-freedom-danger"
-              }`}
+              className="w-full py-4 rounded-xl items-center"
+              style={{
+                backgroundColor:
+                  alertModal.type === "success" ? t.accentColor : t.dangerColor,
+              }}
             >
-              <Text className="text-white font-bold text-lg">OK</Text>
+              <Text
+                className="font-bold text-lg"
+                style={{ color: t.textColor }}
+              >
+                OK
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -632,23 +743,39 @@ export default function BlockAdultScreen(): ReactNode {
       {/* Progress Modal */}
       {isUpdating && (
         <View className="absolute inset-0 bg-black/30 justify-center items-center pointer-events-none">
-          <View className="bg-white dark:bg-freedom-surface p-6 rounded-2xl w-2/3 items-center shadow-xl">
-            <ActivityIndicator color="#2DD4BF" size="large" />
-            <Text className="text-black dark:text-white font-bold mt-4 text-center">
+          <View
+            className="p-6 rounded-2xl w-2/3 items-center shadow-xl"
+            style={{ backgroundColor: t.cardBgColor }}
+          >
+            <ActivityIndicator color={t.accentColor} size="large" />
+            <Text
+              className="font-bold mt-4 text-center"
+              style={{ color: t.textColor }}
+            >
               Updating Sources
             </Text>
-            <Text className="text-freedom-text-muted text-xs mt-1 text-center">
+            <Text
+              className="text-xs mt-1 text-center"
+              style={{ color: t.mutedTextColor }}
+            >
               {updateProgress.name}
             </Text>
-            <View className="w-full bg-gray-200 dark:bg-freedom-secondary h-2 rounded-full mt-4 overflow-hidden">
+            <View
+              className="w-full h-2 rounded-full mt-4 overflow-hidden"
+              style={{ backgroundColor: t.mutedTextColor + "33" }}
+            >
               <View
-                className="bg-freedom-accent h-full"
                 style={{
+                  backgroundColor: t.accentColor,
+                  height: "100%",
                   width: `${(updateProgress.current / (updateProgress.total || 1)) * 100}%`,
                 }}
               />
             </View>
-            <Text className="text-freedom-text-muted text-[10px] mt-2">
+            <Text
+              className="text-[10px] mt-2"
+              style={{ color: t.mutedTextColor }}
+            >
               {updateProgress.current} / {updateProgress.total}
             </Text>
           </View>

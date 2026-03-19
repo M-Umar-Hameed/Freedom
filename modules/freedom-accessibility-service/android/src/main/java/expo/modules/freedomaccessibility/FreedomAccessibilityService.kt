@@ -489,21 +489,37 @@ class FreedomAccessibilityService : AccessibilityService() {
      *
      * The overlay auto-hides after OVERLAY_DURATION_MS.
      */
+    private fun loadThemeFromPrefs(): org.json.JSONObject {
+        val prefs = getSharedPreferences("freedom_settings", MODE_PRIVATE)
+        val json = prefs.getString("overlay_theme", null)
+        return if (json != null) {
+            try { org.json.JSONObject(json) } catch (_: Exception) { org.json.JSONObject() }
+        } else org.json.JSONObject()
+    }
+
     @Synchronized
     private fun showInstantOverlay(targetPackage: String, message: String, surveillanceType: String = "none", surveillanceValue: Int = 0) {
         handler.post {
             if (isInstantOverlayShowing) {
-                // If it's already showing, just update message (unless it's a timer/clicker)
                 return@post
             }
 
             try {
+                val theme = loadThemeFromPrefs()
+                val bgColor = theme.optString("bgColor", "#0B1215")
+                val accentColor = theme.optString("accentColor", "#2DD4BF")
+                val textColorHex = theme.optString("textColor", "#FFFFFF")
+                val mutedTextColor = theme.optString("mutedTextColor", "#CBD5E1")
+                val cardBgColor = theme.optString("cardBgColor", "#1A2421")
+                val titleStr = theme.optString("title", "Blocked!")
+                val subtitleStr = theme.optString("subtitle", "Stay Sharp - Stay Disciplined")
+                val headingStr = theme.optString("heading", "You are on a mission to build a better future!")
+                val bodyStr = theme.optString("body", "Giving in to cheap dopamine is not an option. Back away right now, get back to the grind, and crush your goals today!")
+
                 val params = WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                    // Never use FLAG_NOT_FOCUSABLE — overlay must block all touches
-                    // to prevent interaction with the app underneath.
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                     PixelFormat.OPAQUE
@@ -513,42 +529,113 @@ class FreedomAccessibilityService : AccessibilityService() {
                 val density = resources.displayMetrics.density
 
                 val container = FrameLayout(this).apply {
-                    setBackgroundColor(Color.BLACK)
+                    setBackgroundColor(Color.parseColor(bgColor))
                 }
 
                 val layout = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
+                    setPadding((24 * density).toInt(), (60 * density).toInt(), (24 * density).toInt(), (60 * density).toInt())
                 }
 
-                val emoji = TextView(this).apply {
-                    text = "\u26D4"
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 64f)
-                    gravity = Gravity.CENTER
+                // Accent circle with icon
+                val iconRing = FrameLayout(this).apply {
+                    val size = (100 * density).toInt()
+                    layoutParams = LinearLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER; bottomMargin = (20 * density).toInt() }
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(Color.parseColor(accentColor) and 0x1AFFFFFF or 0x1A000000)
+                        setStroke((3 * density).toInt(), Color.parseColor(accentColor) and 0x80FFFFFF.toInt() or -0x80000000)
+                    }
                 }
+                val iconInner = TextView(this).apply {
+                    text = "\u26A1"
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 44f)
+                    gravity = Gravity.CENTER
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER
+                    )
+                }
+                iconRing.addView(iconInner)
 
                 val title = TextView(this).apply {
-                    text = "Stay Away"
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
-                    setTextColor(Color.WHITE)
+                    text = titleStr
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 36f)
+                    setTextColor(Color.parseColor(textColorHex))
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
-                    setPadding(0, (24 * density).toInt(), 0, (16 * density).toInt())
+                    isAllCaps = true
+                    letterSpacing = 0.12f
+                    setPadding(0, 0, 0, (4 * density).toInt())
                 }
 
                 val subtitle = TextView(this).apply {
-                    text = message
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                    setTextColor(Color.parseColor("#AAAAAA"))
+                    text = subtitleStr
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTextColor(Color.parseColor(accentColor))
+                    typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
-                    setPadding(0, 0, 0, (32 * density).toInt())
+                    isAllCaps = true
+                    letterSpacing = 0.1f
+                    setPadding(0, 0, 0, (24 * density).toInt())
+                }
+
+                // Card with heading + body
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(Color.parseColor(cardBgColor))
+                        cornerRadius = (16 * density)
+                    }
+                    setPadding((24 * density).toInt(), (20 * density).toInt(), (24 * density).toInt(), (20 * density).toInt())
+                }
+                val accentBar = android.view.View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (4 * density).toInt()).apply { bottomMargin = (12 * density).toInt() }
+                    setBackgroundColor(Color.parseColor(accentColor))
+                }
+                val cardHeading = TextView(this).apply {
+                    text = headingStr
+                    setTextColor(Color.parseColor(textColorHex))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    setPadding(0, 0, 0, (6 * density).toInt())
+                }
+                val cardBody = TextView(this).apply {
+                    text = bodyStr
+                    setTextColor(Color.parseColor(mutedTextColor))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    gravity = Gravity.CENTER
+                }
+                card.addView(accentBar)
+                card.addView(cardHeading)
+                card.addView(cardBody)
+
+                val cardParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (24 * density).toInt() }
+
+                // Dynamic message (what was blocked)
+                val blockedInfo = TextView(this).apply {
+                    text = message
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    setTextColor(Color.parseColor(mutedTextColor))
+                    gravity = Gravity.CENTER
+                    setPadding(0, 0, 0, (16 * density).toInt())
                 }
 
                 val button = TextView(this).apply {
                     text = "I understand"
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                    setTextColor(Color.WHITE)
-                    setBackgroundColor(Color.parseColor("#333333"))
+                    setTextColor(Color.parseColor(textColorHex))
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(Color.parseColor(accentColor))
+                        cornerRadius = (8 * density)
+                    }
                     gravity = Gravity.CENTER
                     setPadding(
                         (32 * density).toInt(), (14 * density).toInt(),
@@ -601,7 +688,7 @@ class FreedomAccessibilityService : AccessibilityService() {
                     }
 
                     if (button.isEnabled) {
-                         if (surveillanceType != "none") {
+                         if (surveillanceType == "timer" || surveillanceType == "click") {
                              // They passed the barrier: Temporarily whitelist for 15 minutes
                              contentMatcher.allowAppTemporarily(targetPackage, 15 * 60 * 1000L)
                              
@@ -627,13 +714,15 @@ class FreedomAccessibilityService : AccessibilityService() {
 
                 updateButtonState()
 
-                layout.addView(emoji)
+                layout.addView(iconRing)
                 layout.addView(title)
                 layout.addView(subtitle)
+                layout.addView(card, cardParams)
+                layout.addView(blockedInfo)
                 layout.addView(button)
 
                 val layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     Gravity.CENTER
                 )

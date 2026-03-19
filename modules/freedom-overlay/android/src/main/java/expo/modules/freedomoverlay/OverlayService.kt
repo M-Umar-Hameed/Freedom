@@ -187,88 +187,166 @@ class OverlayService : Service() {
         }
     }
 
+    private fun loadThemeFromPrefs(): org.json.JSONObject {
+        val prefs = getSharedPreferences("freedom_settings", MODE_PRIVATE)
+        val json = prefs.getString("overlay_theme", null)
+        return if (json != null) {
+            try { org.json.JSONObject(json) } catch (_: Exception) { org.json.JSONObject() }
+        } else org.json.JSONObject()
+    }
+
     /**
      * Create the overlay view programmatically.
-     * Dark semi-transparent background with centered "Stay Away" message.
+     * Reads theme colors and texts from SharedPreferences.
      */
     private fun createOverlayView(): FrameLayout {
+        val theme = loadThemeFromPrefs()
+        val bgColor = theme.optString("bgColor", "#0B1215")
+        val accentColor = theme.optString("accentColor", "#2DD4BF")
+        val textColor = theme.optString("textColor", "#FFFFFF")
+        val mutedTextColor = theme.optString("mutedTextColor", "#CBD5E1")
+        val cardBgColor = theme.optString("cardBgColor", "#1A2421")
+        val titleStr = theme.optString("title", "Blocked!")
+        val subtitleStr = theme.optString("subtitle", "Stay Sharp - Stay Disciplined")
+        val headingStr = theme.optString("heading", "You are on a mission to build a better future!")
+        val bodyStr = theme.optString("body", "Giving in to cheap dopamine is not an option. Back away right now, get back to the grind, and crush your goals today!")
+
         val container = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#F0121212")) // Near-opaque dark
-            isClickable = true // Absorb all touches
+            setBackgroundColor(Color.parseColor(bgColor))
+            isClickable = true
         }
 
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(40), dp(60), dp(40), dp(60))
+            setPadding(dp(24), dp(60), dp(24), dp(60))
         }
 
-        // Shield icon (emoji)
-        val iconText = TextView(this).apply {
-            text = "🛡️"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 72f)
-            gravity = Gravity.CENTER
+        // Accent circle with icon
+        val iconRing = FrameLayout(this).apply {
+            val size = dp(128)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER; bottomMargin = dp(24) }
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.parseColor(accentColor) and 0x1AFFFFFF or 0x1A000000)
+                setStroke(dp(3), Color.parseColor(accentColor) and 0x80FFFFFF.toInt() or -0x80000000)
+            }
         }
+        val iconInner = TextView(this).apply {
+            text = "\u26A1"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 56f)
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER
+            )
+        }
+        iconRing.addView(iconInner)
 
         // Title
         val titleText = TextView(this).apply {
-            text = "Stay Away"
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 36f)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            text = titleStr
+            setTextColor(Color.parseColor(textColor))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 40f)
+            typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, dp(24), 0, dp(12))
+            isAllCaps = true
+            letterSpacing = 0.15f
+            setPadding(0, 0, 0, dp(4))
         }
 
-        // Message
-        val messageText = TextView(this).apply {
-            text = currentMessage
-            tag = "messageText"
-            setTextColor(Color.parseColor("#B0B0B0"))
+        // Subtitle
+        val subtitleText = TextView(this).apply {
+            text = subtitleStr
+            setTextColor(Color.parseColor(accentColor))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
+            isAllCaps = true
+            letterSpacing = 0.12f
             setPadding(0, 0, 0, dp(32))
         }
 
-        // Motivational quote
-        val quoteText = TextView(this).apply {
-            text = "\"Every moment of resistance makes you stronger.\""
-            setTextColor(Color.parseColor("#808080"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            typeface = Typeface.create("sans-serif", Typeface.ITALIC)
+        // Card
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(20), 0, dp(20), dp(40))
-        }
-
-        // Dismiss Button
-        val dismissButton = android.widget.Button(this).apply {
-            text = "I Understand"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#E94560")) // Freedom accent color
-            setPadding(dp(24), dp(12), dp(24), dp(12))
-            isAllCaps = false
-            textSize = 16f
-            setOnClickListener {
-                hideOverlay()
+            val bg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor(cardBgColor))
+                cornerRadius = dp(16).toFloat()
             }
+            background = bg
+            setPadding(dp(24), dp(20), dp(24), dp(20))
         }
 
-        val buttonParams = LinearLayout.LayoutParams(
+        // Card accent top bar
+        val accentBar = android.view.View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4)).apply {
+                bottomMargin = dp(16)
+            }
+            setBackgroundColor(Color.parseColor(accentColor))
+        }
+
+        val cardHeading = TextView(this).apply {
+            text = headingStr
+            tag = "messageText"
+            setTextColor(Color.parseColor(textColor))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(8))
+        }
+
+        val cardBody = TextView(this).apply {
+            text = bodyStr
+            setTextColor(Color.parseColor(mutedTextColor))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 0)
+        }
+
+        card.addView(accentBar)
+        card.addView(cardHeading)
+        card.addView(cardBody)
+
+        val cardParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        // Footer pill
+        val footer = TextView(this).apply {
+            text = "Return to safety to dismiss"
+            setTextColor(Color.parseColor(mutedTextColor))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = Typeface.DEFAULT_BOLD
+            isAllCaps = true
+            letterSpacing = 0.1f
+            gravity = Gravity.CENTER
+            val bg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor(cardBgColor) and 0xCCFFFFFF.toInt() or 0x00000000)
+                cornerRadius = dp(20).toFloat()
+            }
+            background = bg
+            setPadding(dp(24), dp(12), dp(24), dp(12))
+        }
+        val footerParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            topMargin = dp(24)
+            topMargin = dp(48)
             gravity = Gravity.CENTER
         }
 
-        content.addView(iconText)
+        content.addView(iconRing)
         content.addView(titleText)
-        content.addView(messageText)
-        content.addView(quoteText)
-        content.addView(dismissButton, buttonParams)
+        content.addView(subtitleText)
+        content.addView(card, cardParams)
+        content.addView(footer, footerParams)
 
         val contentParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
             gravity = Gravity.CENTER
