@@ -33,6 +33,20 @@ export interface BlockingState {
   // Blocked Apps
   blockedApps: BlockedApp[];
 
+  // Reels blocking (per-app package names that are enabled)
+  enabledReelsApps: string[];
+  reelsControlMode: ControlMode;
+  reelsSurveillance: SurveillanceConfig;
+
+  // Reels actions
+  toggleReelsApp: (packageName: string) => void;
+  setReelsControlMode: (mode: ControlMode) => void;
+  setReelsSurveillance: (config: SurveillanceConfig) => void;
+
+  // NSFW app monitoring (per-app package names scanned for keywords)
+  enabledNsfwApps: string[];
+  toggleNsfwApp: (packageName: string) => void;
+
   // Keyword actions
   addKeyword: (keyword: string) => void;
   removeKeyword: (keyword: string) => void;
@@ -123,6 +137,32 @@ export const useBlockingStore = create<BlockingState>()(
       categoryDomainCounts: {},
       sources: DEFAULT_SOURCES,
       blockedApps: [],
+      enabledReelsApps: [],
+      reelsControlMode: "flexible",
+      reelsSurveillance: { type: "none", value: 0 },
+
+      toggleReelsApp: (packageName) =>
+        set((state) => {
+          const exists = state.enabledReelsApps.includes(packageName);
+          return {
+            enabledReelsApps: exists
+              ? state.enabledReelsApps.filter((p) => p !== packageName)
+              : [...state.enabledReelsApps, packageName],
+          };
+        }),
+      setReelsControlMode: (mode) => set({ reelsControlMode: mode }),
+      setReelsSurveillance: (config) => set({ reelsSurveillance: config }),
+
+      enabledNsfwApps: [],
+      toggleNsfwApp: (packageName) =>
+        set((state) => {
+          const exists = state.enabledNsfwApps.includes(packageName);
+          return {
+            enabledNsfwApps: exists
+              ? state.enabledNsfwApps.filter((p) => p !== packageName)
+              : [...state.enabledNsfwApps, packageName],
+          };
+        }),
 
       addKeyword: (keyword) =>
         set((state) => {

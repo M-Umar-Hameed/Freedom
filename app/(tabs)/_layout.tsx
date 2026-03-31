@@ -76,6 +76,15 @@ export default function TabLayout(): ReactNode {
         }}
       />
       <Tabs.Screen
+        name="block-reels"
+        options={{
+          title: "Reels",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="play-circle-outline" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="block-apps"
         options={{
           title: "Apps",

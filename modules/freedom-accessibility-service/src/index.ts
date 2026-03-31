@@ -125,6 +125,13 @@ export async function updateWhitelist(domains: string[]): Promise<void> {
   return FreedomAccessibilityNative.updateWhitelist(domains);
 }
 
+export async function updateNsfwMonitoredApps(
+  packages: string[],
+): Promise<void> {
+  if (!FreedomAccessibilityNative) return;
+  return FreedomAccessibilityNative.updateNsfwMonitoredApps(packages);
+}
+
 export async function updateAdultBlockingEnabled(
   enabled: boolean,
 ): Promise<void> {

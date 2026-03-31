@@ -10,9 +10,9 @@ import android.view.accessibility.AccessibilityNodeInfo
  * Detection strategy:
  * 1. Check if the foreground app is a monitored social media app
  * 2. Traverse the accessibility node tree looking for detection node IDs
- * 3. If a detection node is found → user is viewing reels
+ * 3. If a detection node is found - user is viewing reels
  *
- * This does NOT block the entire app — only the reels/shorts section.
+ * This does NOT block the entire app - only the reels/shorts section.
  */
 class ReelsDetector {
 
@@ -102,7 +102,7 @@ class ReelsDetector {
             try {
                 val nodes = rootNode.findAccessibilityNodeInfosByViewId(fullResourceId)
                 if (nodes != null && nodes.isNotEmpty()) {
-                    // Found a reels node — check if it's visible
+                    // Found a reels node - check if it's visible
                     val found = nodes.any { node ->
                         val visible = node.isVisibleToUser
                         node.recycle()
@@ -114,55 +114,79 @@ class ReelsDetector {
                     }
                 }
             } catch (e: Exception) {
-                // Node search failed — continue checking other IDs
+                // Node search failed - continue checking other IDs
             }
         }
 
         // Fallback: check content descriptions and class names for reels keywords
-        return scanNodeTreeForReelsHints(rootNode)
+        return scanNodeTreeForReelsHints(rootNode, packageName)
     }
 
     /**
-     * Fallback detection: scan visible nodes for reels-related keywords.
-     * This catches cases where resource IDs change across app updates.
+     * Fallback detection: use findAccessibilityNodeInfosByText to search the
+     * entire node tree for reels keywords. This is much more reliable than
+     * manual traversal since it searches all depths and checks both text
+     * and contentDescription.
      */
-    private fun scanNodeTreeForReelsHints(node: AccessibilityNodeInfo?): Boolean {
+    private fun scanNodeTreeForReelsHints(node: AccessibilityNodeInfo?, packageName: String): Boolean {
         if (node == null) return false
 
         try {
-            // Check this node's content description
-            val contentDesc = node.contentDescription?.toString()?.lowercase() ?: ""
-            if (REELS_KEYWORDS.any { contentDesc.contains(it) }) {
-                // Verify it's a significant UI element (not just a small label)
-                val className = node.className?.toString() ?: ""
-                if (className.contains("ViewPager") ||
-                    className.contains("RecyclerView") ||
-                    className.contains("FrameLayout")) {
-                    return true
-                }
-            }
+            for (keyword in REELS_KEYWORDS) {
+                val matches = node.findAccessibilityNodeInfosByText(keyword)
+                if (matches.isNullOrEmpty()) continue
 
-            // Check children (limited depth to avoid performance issues)
-            val childCount = node.childCount
-            for (i in 0 until minOf(childCount, MAX_CHILD_SCAN)) {
-                val child = node.getChild(i) ?: continue
-                // Only scan 1 level deep for performance
-                val childDesc = child.contentDescription?.toString()?.lowercase() ?: ""
-                if (REELS_KEYWORDS.any { childDesc.contains(it) }) {
-                    val className = child.className?.toString() ?: ""
-                    child.recycle()
-                    if (className.contains("ViewPager") ||
-                        className.contains("RecyclerView")) {
-                        return true
+                var found = false
+                for (match in matches) {
+                    if (!found && match.isVisibleToUser) {
+                        // For Facebook, these keywords are often landing page entry points.
+                        // We block the landing page if these keywords are present.
+                        val isFacebookLanding = (keyword == "Watch" || keyword == "Video home") && 
+                                                packageName.contains("com.facebook.")
+                        
+                        if (isFacebookLanding) {
+                            Log.d(TAG, "Facebook Video Landing detected via keyword: $keyword")
+                            found = true
+                        } else {
+                            // General swiping logic: check for scrollable ancestor
+                            found = hasScrollableReelsAncestor(match, packageName)
+                            if (found) Log.d(TAG, "Reels detected in $packageName via keyword: $keyword")
+                        }
                     }
-                } else {
-                    child.recycle()
+                    match.recycle()
                 }
+                if (found) return true
             }
         } catch (e: Exception) {
             Log.w(TAG, "Error scanning node tree: ${e.message}")
         }
 
+        return false
+    }
+
+    /**
+     * Walk up to 5 ancestors looking for a scrollable ViewPager or RecyclerView.
+     */
+    private fun hasScrollableReelsAncestor(node: AccessibilityNodeInfo, packageName: String): Boolean {
+        var current = node.parent ?: return false
+        for (i in 0 until 10) {
+            val className = current.className?.toString() ?: ""
+            // Only match ViewPager - the swipeable video container used by
+            // reels/shorts feeds. RecyclerView is too broad for Instagram,
+            // but Facebook often uses RecyclerView for its reels.
+            val isViewPager = className.contains("ViewPager")
+            val isFacebookRecycler = packageName.contains("com.facebook.") && className.contains("RecyclerView")
+            
+            if ((isViewPager || isFacebookRecycler) && current.isScrollable) {
+                current.recycle()
+                return true
+            }
+
+            val next = current.parent
+            current.recycle()
+            current = next ?: return false
+        }
+        current.recycle()
         return false
     }
 
@@ -181,15 +205,18 @@ class ReelsDetector {
 
     companion object {
         private const val TAG = "ReelsDetector"
-        private const val MAX_CHILD_SCAN = 20
 
-        // Fallback keywords for reels detection (lowercase)
+        // Fallback keywords for reels detection
         private val REELS_KEYWORDS = listOf(
-            "shorts",
-            "reels",
-            "reel",
-            "spotlight",
-            "short video"
+            "Shorts",
+            "Reels",
+            "Reel",
+            "Spotlight",
+            "Short video",
+            "Video home",
+            "Watch",
+            "Watch feed",
+            "Videos on Watch"
         )
     }
 }

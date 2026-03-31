@@ -47,6 +47,9 @@ class ContentMatcher {
     // Store package names and their expiry timestamp in milliseconds
     private val temporaryAppAllowlist = ConcurrentHashMap<String, Long>()
 
+    // Apps monitored for NSFW content via keyword scanning
+    @Volatile private var nsfwMonitoredApps = ConcurrentHashMap.newKeySet<String>()
+
     private val searchEngineDomains = setOf(
         "google.com", "bing.com", "duckduckgo.com", "yahoo.com", 
         "baidu.com", "yandex.com", "ecosia.org", "startpage.com"
@@ -325,6 +328,16 @@ class ContentMatcher {
      * Get the set of blocked keywords for WebView text search.
      */
     fun getKeywords(): Set<String> = blockedKeywords.toSet()
+
+    fun setNsfwMonitoredApps(packages: Collection<String>) {
+        nsfwMonitoredApps.clear()
+        packages.forEach { nsfwMonitoredApps.add(it.trim().lowercase()) }
+        Log.i("ContentMatcher", "Updated NSFW monitored apps: ${nsfwMonitoredApps.size}")
+    }
+
+    fun isNsfwMonitoredApp(packageName: String): Boolean {
+        return nsfwMonitoredApps.contains(packageName.trim().lowercase())
+    }
 
     /**
      * Check if a domain is whitelisted (public accessor for callers that need

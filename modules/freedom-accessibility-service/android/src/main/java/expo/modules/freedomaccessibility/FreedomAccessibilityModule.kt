@@ -344,6 +344,20 @@ class FreedomAccessibilityModule : Module() {
             }
         }
 
+        AsyncFunction("updateNsfwMonitoredApps") { packages: List<String>, promise: Promise ->
+            try {
+                val matcher = FreedomAccessibilityService.sharedContentMatcher
+                if (matcher != null) {
+                    matcher.setNsfwMonitoredApps(packages)
+                } else {
+                    ContentMatcher().setNsfwMonitoredApps(packages)
+                }
+                promise.resolve(null)
+            } catch (e: Exception) {
+                promise.reject("ERR_NSFW_APPS", e.message, e)
+            }
+        }
+
         AsyncFunction("updateOverlayTheme") { themeJson: String, promise: Promise ->
             try {
                 val context = appContext.reactContext
@@ -382,18 +396,14 @@ class FreedomAccessibilityModule : Module() {
         }
 
         AsyncFunction("getInstalledApps") { promise: Promise ->
-            if (cachedInstalledApps != null) {
-                promise.resolve(cachedInstalledApps!!)
-                return@AsyncFunction
-            }
-
             val context = appContext.reactContext ?: run {
                 promise.resolve(emptyList<Map<String, String>>())
                 return@AsyncFunction
             }
-            
+
             java.lang.Thread {
                 try {
+                    // Always re-query so newly installed apps appear
                     val apps = prefetchInstalledApps(context)
                     promise.resolve(apps)
                 } catch (e: Exception) {

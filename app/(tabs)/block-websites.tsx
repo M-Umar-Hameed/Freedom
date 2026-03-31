@@ -1,4 +1,5 @@
 import { InteractionGuard } from "@/components/InteractionGuard";
+import { NSFW_APPS } from "@/constants/nsfw-apps";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
@@ -87,6 +88,8 @@ export default function BlockWebsitesScreen(): ReactNode {
     setSiteControlMode,
     siteSurveillance,
     setSiteSurveillance,
+    enabledNsfwApps,
+    toggleNsfwApp,
   } = useBlockingStore();
 
   // Effective mode = stricter of main + sub
@@ -119,6 +122,11 @@ export default function BlockWebsitesScreen(): ReactNode {
   const handleAddPress = (): void => {
     const trimmed = newValue.trim().toLowerCase();
     if (!trimmed) return;
+    // Whitelist additions weaken protection - require guard in non-flexible modes
+    if (activeTab === "whitelisted" && !isEffectiveFlexible) {
+      setPendingAction({ type: "add", value: trimmed, tab: "whitelisted" });
+      return;
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (activeTab === "keywords") addStoreKeyword(trimmed);
     else if (activeTab === "blocked") addIncludedUrl(trimmed);
@@ -587,7 +595,7 @@ export default function BlockWebsitesScreen(): ReactNode {
           </>
         )}
 
-        {/* Blocked / Whitelisted Tab — with toggles */}
+        {/* Blocked / Whitelisted Tab - with toggles */}
         {(activeTab === "blocked" || activeTab === "whitelisted") && (
           <>
             {(activeTab === "blocked" ? includedUrls : excludedUrls).length ===
@@ -680,6 +688,83 @@ export default function BlockWebsitesScreen(): ReactNode {
               </View>
             )}
           </>
+        )}
+
+        {/* NSFW App Monitoring */}
+        {activeTab === "keywords" && keywords.length > 0 && (
+          <View className="mt-8">
+            <Text
+              className="text-xs font-bold uppercase mb-3 px-1"
+              style={{ color: t.mutedTextColor }}
+            >
+              Monitor Apps for Keywords
+            </Text>
+            <Text
+              className="text-xs mb-4 px-1"
+              style={{ color: t.mutedTextColor }}
+            >
+              Scan these apps for your blocked keywords in post captions and
+              labels. Blocks explicit content on platforms that allow it.
+            </Text>
+            {NSFW_APPS.map((app) => {
+              const enabled = enabledNsfwApps.includes(app.packageName);
+              return (
+                <Pressable
+                  key={app.packageName}
+                  onPress={() => {
+                    void Haptics.impactAsync(
+                      Haptics.ImpactFeedbackStyle.Medium,
+                    );
+                    toggleNsfwApp(app.packageName);
+                  }}
+                  className="flex-row items-center p-4 rounded-xl mb-2"
+                  style={{
+                    backgroundColor: t.cardBgColor,
+                    borderWidth: 2,
+                    borderColor: enabled ? t.accentColor : "transparent",
+                  }}
+                >
+                  <View
+                    className="w-10 h-10 rounded-lg items-center justify-center mr-4"
+                    style={{
+                      backgroundColor: enabled
+                        ? t.accentColor
+                        : t.mutedTextColor + "1A",
+                    }}
+                  >
+                    <Ionicons
+                      name="eye-off-outline"
+                      size={24}
+                      color={enabled ? "white" : t.mutedTextColor}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="font-bold" style={{ color: t.textColor }}>
+                      {app.name}
+                    </Text>
+                    <Text
+                      className="text-xs"
+                      style={{ color: t.mutedTextColor }}
+                    >
+                      {enabled ? "Scanning for keywords" : "Tap to enable"}
+                    </Text>
+                  </View>
+                  <View
+                    className="w-12 h-6 rounded-full px-1 justify-center"
+                    style={{
+                      backgroundColor: enabled ? t.accentColor : "#9CA3AF",
+                    }}
+                  >
+                    <View
+                      className={`w-4 h-4 rounded-full bg-white ${
+                        enabled ? "self-end" : "self-start"
+                      }`}
+                    />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
 
@@ -1039,21 +1124,28 @@ export default function BlockWebsitesScreen(): ReactNode {
       <InteractionGuard
         visible={!!pendingAction}
         actionName={
-          pendingAction?.type === "remove_all"
-            ? "Delete All Keywords"
-            : pendingAction?.type === "remove_multiple"
-              ? `Delete ${selectedKeywords.size} Keywords`
-              : pendingAction?.type === "toggle"
-                ? "Toggle Website"
-                : pendingAction?.tab === "blocked"
-                  ? "Unblock Website"
-                  : pendingAction?.tab === "whitelisted"
-                    ? "Un-whitelist Website"
-                    : "Remove Keyword"
+          pendingAction?.type === "add"
+            ? "Add Whitelisted Website"
+            : pendingAction?.type === "remove_all"
+              ? "Delete All Keywords"
+              : pendingAction?.type === "remove_multiple"
+                ? `Delete ${selectedKeywords.size} Keywords`
+                : pendingAction?.type === "toggle"
+                  ? "Toggle Website"
+                  : pendingAction?.tab === "blocked"
+                    ? "Unblock Website"
+                    : pendingAction?.tab === "whitelisted"
+                      ? "Un-whitelist Website"
+                      : "Remove Keyword"
         }
         surveillanceOverride={effectiveSurveillance}
         onSuccess={() => {
-          if (pendingAction?.type === "remove" && pendingAction.value)
+          if (pendingAction?.type === "add" && pendingAction.value) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            addExcludedUrl(pendingAction.value);
+            setNewValue("");
+            setPendingAction(null);
+          } else if (pendingAction?.type === "remove" && pendingAction.value)
             performRemove(pendingAction.value);
           else if (pendingAction?.type === "toggle" && pendingAction.value)
             performToggle(pendingAction.value);

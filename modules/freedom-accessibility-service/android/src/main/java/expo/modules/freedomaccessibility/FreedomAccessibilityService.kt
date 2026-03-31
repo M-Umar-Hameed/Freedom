@@ -8,12 +8,13 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.net.Uri
-import android.widget.ImageView
 import android.os.Handler
 import android.os.Looper
+import android.widget.ImageView
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
@@ -22,7 +23,7 @@ import android.widget.TextView
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 
 /**
- * Freedom Accessibility Service — URL monitoring + Reels detection.
+ * Freedom Accessibility Service - URL monitoring + Reels detection.
  *
  * Layer 2 + Layer 3 of the content blocking architecture:
  * - Layer 2: Monitors browser URL bars to catch content the VPN didn't block
@@ -42,6 +43,7 @@ class FreedomAccessibilityService : AccessibilityService() {
     private var windowManager: WindowManager? = null
     private var instantOverlay: FrameLayout? = null
     private var isInstantOverlayShowing = false
+    private var reelsOverlayPackage: String? = null
     private val handler = Handler(Looper.getMainLooper())
     private var lastUrlCheckTime: Long = 0
     private var consecutiveBlockCount = 0
@@ -55,7 +57,17 @@ class FreedomAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "FreedomA11y"
         private const val OVERLAY_DURATION_MS = 5000L
-        private val OVERLAY_DISMISS_TOKEN = Object()
+        private val OVERLAY_DISMISS_TOKEN = Any()
+
+        // Built-in keywords for NSFW app scanning (Reddit, Twitter labels)
+        private val NSFW_BUILTIN_KEYWORDS = listOf(
+            "NSFW",
+            "18+",
+            "Sensitive content",
+            "Content warning",
+            "Adult content",
+            "Mature content"
+        )
 
         @Volatile
         var isRunning: Boolean = false
@@ -71,7 +83,7 @@ class FreedomAccessibilityService : AccessibilityService() {
         var sharedSettingsProtector: SettingsProtector? = null
             private set
 
-        // Pending configs buffer — holds configs sent before service was ready
+        // Pending configs buffer - holds configs sent before service was ready
         var pendingBrowserConfigs: List<BrowserUrlMonitor.BrowserConfig>? = null
 
         // Broadcast actions
@@ -168,28 +180,36 @@ class FreedomAccessibilityService : AccessibilityService() {
                 packageName.contains("settings") ||
                 packageName.contains("manageapp")
 
-        if (!browserMonitor.isBrowser(packageName) && !isDetachedWebview && !isBlockedApp && !isSettingsApp) {
-            if (classNameStr.contains("browser") || classNameStr.contains("web")) {
-                Log.d(TAG, "SAMSUNG DEBUG: Ignored event from non-monitored package | Pkg: $packageName | Class: $classNameStr")
-            }
-            return
-        }
         // Track current foreground app
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (packageName != currentPackage) {
-                // User switched apps — reset all blocking state for previous app
+                // User switched apps - reset reels state for both old and new app
+                // so detection fires fresh when (re-)entering a reels app.
                 if (currentPackage.isNotEmpty()) {
                     reelsDetector.resetState(currentPackage)
                     broadcastReelsDetected(ReelsDetector.DetectionResult("App", currentPackage, false))
                 }
+                reelsDetector.resetState(packageName)
                 currentPackage = packageName
-                // Clear stale URL check state so it doesn't leak across apps
                 lastCheckUrl = ""
                 lastUrlCheckTime = 0
                 consecutiveBlockCount = 0
-                // Dismiss any lingering overlay from the previous app
-                hideInstantOverlay()
+                // Dismiss any lingering overlay - but never dismiss a reels
+                // overlay here. The reels overlay is dismissed only by the
+                // "I understand" button handler, which sends the user home/back.
+                if (reelsOverlayPackage == null) {
+                    hideInstantOverlay()
+                }
             }
+        }
+
+        val isNsfwMonitored = contentMatcher.isNsfwMonitoredApp(packageName)
+
+        if (!browserMonitor.isBrowser(packageName) && !isDetachedWebview && !isBlockedApp && !isSettingsApp && !reelsDetector.isReelsApp(packageName) && !isNsfwMonitored) {
+            if (classNameStr.contains("browser") || classNameStr.contains("web")) {
+                Log.d(TAG, "SAMSUNG DEBUG: Ignored event from non-monitored package | Pkg: $packageName | Class: $classNameStr")
+            }
+            return
         }
 
         try {
@@ -209,7 +229,7 @@ class FreedomAccessibilityService : AccessibilityService() {
                 appConfig != null -> {
                     Log.w(TAG, "Blocking app launch: $packageName (Config: ${appConfig.appName}, surveillance: ${appConfig.surveillanceType})")
                     showInstantOverlay(packageName, "${appConfig.appName} is blocked", appConfig.surveillanceType, appConfig.surveillanceValue)
-                    // Only go home for hard blocks — timer/click overlays need user interaction
+                    // Only go home for hard blocks - timer/click overlays need user interaction
                     if (appConfig.surveillanceType == "none") {
                         performGlobalAction(GLOBAL_ACTION_HOME)
                     }
@@ -219,6 +239,9 @@ class FreedomAccessibilityService : AccessibilityService() {
                 }
                 reelsDetector.isReelsApp(packageName) -> {
                     handleReelsEvent(event, rootNode, packageName)
+                }
+                isNsfwMonitored -> {
+                    handleNsfwScan(rootNode, packageName)
                 }
                 packageName == "com.android.settings" ||
                 packageName == "com.google.android.settings" ||
@@ -236,7 +259,7 @@ class FreedomAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Handle a browser event — extract URLs and check for blocked content.
+     * Handle a browser event - extract URLs and check for blocked content.
      * Scans ALL windows belonging to the browser (not just the active window)
      * to catch AMP bars, secondary URL indicators, etc.
      */
@@ -294,8 +317,8 @@ class FreedomAccessibilityService : AccessibilityService() {
         var allowedCandidate = candidates.first()
 
         // Determine if ANY candidate contains a whitelisted domain.
-        // Check all candidates — URL bar, title, toolbar text — not just the first.
-        // Also check embedded domains in text (e.g. "© 2026 mangaread.org inc.")
+        // Check all candidates - URL bar, title, toolbar text - not just the first.
+        // Also check embedded domains in text (e.g. "2026 mangaread.org inc.")
         var pageWhitelisted = false
         var contextDomain: String? = null
         for (c in candidates) {
@@ -374,7 +397,7 @@ class FreedomAccessibilityService : AccessibilityService() {
 
             val fullText = sb.toString()
             if (fullText.isNotBlank()) {
-                // 1. Keyword check on the full blob — skip if page is whitelisted
+                // 1. Keyword check on the full blob - skip if page is whitelisted
                 if (!pageWhitelisted) {
                     val matchedKeyword = contentMatcher.findMatchingKeywordDirectly(fullText)
                     if (matchedKeyword != null) {
@@ -464,7 +487,7 @@ class FreedomAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Handle a reels app event — detect reels/shorts section.
+     * Handle a reels app event - detect reels/shorts section.
      */
     private fun handleReelsEvent(
         event: AccessibilityEvent,
@@ -475,11 +498,53 @@ class FreedomAccessibilityService : AccessibilityService() {
 
         if (result.isInReels) {
             Log.i(TAG, "Reels detected in ${result.appName}")
+            reelsOverlayPackage = packageName
+            showInstantOverlay(packageName, "${result.appName} Reels blocked")
         } else {
             Log.i(TAG, "User left reels in ${result.appName}")
+            reelsOverlayPackage = null
+            hideInstantOverlay()
         }
 
         broadcastReelsDetected(result)
+    }
+
+    private var lastNsfwBlockTime = 0L
+
+    private fun handleNsfwScan(
+        rootNode: android.view.accessibility.AccessibilityNodeInfo?,
+        packageName: String
+    ) {
+        if (rootNode == null || isInstantOverlayShowing) return
+
+        val now = System.currentTimeMillis()
+        if (now - lastNsfwBlockTime < 2000) return
+
+        // Combine built-in NSFW labels with user keywords
+        val allKeywords = NSFW_BUILTIN_KEYWORDS + contentMatcher.getKeywords()
+
+        for (keyword in allKeywords) {
+            try {
+                val matches = rootNode.findAccessibilityNodeInfosByText(keyword)
+                if (matches.isNullOrEmpty()) continue
+
+                var found = false
+                for (match in matches) {
+                    if (!found && match.isVisibleToUser) {
+                        found = true
+                    }
+                    match.recycle()
+                }
+
+                if (found) {
+                    Log.i(TAG, "NSFW keyword '$keyword' found in $packageName")
+                    lastNsfwBlockTime = now
+                    reelsOverlayPackage = packageName
+                    showInstantOverlay(packageName, "Explicit content blocked")
+                    return
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     /**
@@ -493,7 +558,10 @@ class FreedomAccessibilityService : AccessibilityService() {
      * and data: URI intents.
      */
     private fun openBlankPage(browserPackage: String) {
-        if (!browserMonitor.isBrowser(browserPackage)) return
+        if (!browserMonitor.isBrowser(browserPackage)) {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+            return
+        }
 
         // 1. Immediately press Back to pop the browser stack/history
         performGlobalAction(GLOBAL_ACTION_BACK)
@@ -566,8 +634,24 @@ class FreedomAccessibilityService : AccessibilityService() {
 
                 val customImagePath = theme.optString("customImagePath", "")
 
-                val container = FrameLayout(this).apply {
+                val container = object : FrameLayout(this@FreedomAccessibilityService) {
+                    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+                        if (event.action == android.view.KeyEvent.ACTION_DOWN && event.keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                            if (reelsDetector.isReelsApp(targetPackage)) {
+                                reelsOverlayPackage = null
+                                hideInstantOverlay()
+                                // Wait for overlay to detach, then press back to return to App's Feed/Camera
+                                handler.postDelayed({ performGlobalAction(GLOBAL_ACTION_BACK) }, 150)
+                            } else {
+                                performGlobalAction(GLOBAL_ACTION_HOME)
+                            }
+                            return true
+                        }
+                        return super.dispatchKeyEvent(event)
+                    }
+                }.apply {
                     setBackgroundColor(Color.parseColor(bgColor))
+                    isFocusableInTouchMode = true
                 }
 
                 // Background image + scrim
@@ -618,7 +702,7 @@ class FreedomAccessibilityService : AccessibilityService() {
                     }
                 }
                 val iconInner = TextView(this).apply {
-                    text = "\u26A1"
+                    text = ""
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 44f)
                     gravity = Gravity.CENTER
                     layoutParams = FrameLayout.LayoutParams(
@@ -769,15 +853,22 @@ class FreedomAccessibilityService : AccessibilityService() {
                              } else {
                                  Log.w(TAG, "Launch intent for $targetPackage is null, unable to reopen.")
                              }
+                         } else if (reelsDetector.isReelsApp(targetPackage)) {
+                             // Reels block: exit reels trap by pressing Back, placing user on the app's Feed/Camera
+                             reelsOverlayPackage = null
+                             hideInstantOverlay()
+                             handler.postDelayed({ performGlobalAction(GLOBAL_ACTION_BACK) }, 150)
+                             return@setOnClickListener
                          } else {
-                             // Hard block: Try to reset the browser to home before leaving
+                             // Hard block: navigate away
                              if (currentPackage.isNotEmpty()) {
                                  openBlankPage(currentPackage)
                              } else {
                                  performGlobalAction(GLOBAL_ACTION_HOME)
                              }
                          }
-                         hideInstantOverlay() 
+                         reelsOverlayPackage = null
+                         hideInstantOverlay()
                     }
                 }
 
@@ -814,8 +905,10 @@ class FreedomAccessibilityService : AccessibilityService() {
                         }
                     }
                     handler.postDelayed(timerRunnable, 1000)
-                } else if (surveillanceType == "none") {
+                } else if (surveillanceType == "none" && reelsOverlayPackage == null) {
                     // Auto-hide after duration only if no interaction needed
+                    // and this is NOT a reels overlay (reels overlays persist
+                    // until the user clicks "I understand")
                     handler.postAtTime({ hideInstantOverlay() },
                         OVERLAY_DISMISS_TOKEN,
                         android.os.SystemClock.uptimeMillis() + OVERLAY_DURATION_MS)

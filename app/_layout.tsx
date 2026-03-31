@@ -1,6 +1,5 @@
 import { AppLockScreen } from "@/components/AppLockScreen";
 import { APP_THEMES } from "@/constants/overlay-themes";
-import { getLastBlocklistUpdate } from "@/db/database";
 import { AppThemeProvider } from "@/providers/ThemeProvider";
 import { BlocklistService } from "@/services/BlocklistService";
 import { ProtectionService } from "@/services/ProtectionService";
@@ -89,6 +88,8 @@ export default function RootLayout(): ReactNode {
   const excludedUrls = useBlockingStore((s) => s.excludedUrls);
   const adultBlockingEnabled = useBlockingStore((s) => s.adultBlockingEnabled);
   const blockedApps = useBlockingStore((s) => s.blockedApps);
+  const enabledReelsApps = useBlockingStore((s) => s.enabledReelsApps);
+  const enabledNsfwApps = useBlockingStore((s) => s.enabledNsfwApps);
 
   // Centralized debounced sync for all protection settings
   // Note: categories are NOT included — they contain 100k+ domains and are
@@ -104,6 +105,8 @@ export default function RootLayout(): ReactNode {
     excludedUrls,
     adultBlockingEnabled,
     blockedApps,
+    enabledReelsApps,
+    enabledNsfwApps,
     controlMode,
     isMounted,
   ]);
@@ -144,24 +147,14 @@ export default function RootLayout(): ReactNode {
   }, [isMounted, navigationState?.key]);
 
   // On every launch: push cached domains to native (survives process death).
-  // Then if stale (>24h), fetch fresh lists from network.
-  // Skip during onboarding to avoid freezing the permissions screen.
+  // Network updates are only triggered manually by the user.
   useEffect(() => {
     if (!isMounted || !isOnboarded) return;
     if (!useBlockingStore.getState().adultBlockingEnabled) return;
 
-    void (async () => {
-      try {
-        await BlocklistService.syncAllCategoriesFromCache();
-      } catch (e) {
-        console.warn("[Layout] Cache sync failed:", e);
-      }
-      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-      const lastUpdate = getLastBlocklistUpdate();
-      if (Date.now() - lastUpdate > TWENTY_FOUR_HOURS) {
-        void BlocklistService.updateBlocklists().catch(console.error);
-      }
-    })();
+    void BlocklistService.syncAllCategoriesFromCache().catch((e: unknown) => {
+      console.warn("[Layout] Cache sync failed:", e);
+    });
   }, [isMounted, isOnboarded]);
 
   const appThemeId = useAppStore((s) => s.appThemeId);

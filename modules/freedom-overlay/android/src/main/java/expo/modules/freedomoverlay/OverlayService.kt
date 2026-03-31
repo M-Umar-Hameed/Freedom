@@ -270,7 +270,7 @@ class OverlayService : Service() {
             }
         }
         val iconInner = TextView(this).apply {
-            text = "\u26A1"
+            text = ""
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 56f)
             gravity = Gravity.CENTER
             layoutParams = FrameLayout.LayoutParams(

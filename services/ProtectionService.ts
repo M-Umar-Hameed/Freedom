@@ -1,4 +1,6 @@
 import { BROWSERS } from "@/constants/browsers";
+import { NSFW_APPS } from "@/constants/nsfw-apps";
+import { REELS_APPS } from "@/constants/reels";
 import { getResolvedTheme } from "@/constants/overlay-themes";
 import { incrementDailyBlockedCount, logBlockedUrl } from "@/db/database";
 import * as FreedomAccessibility from "@/modules/freedom-accessibility-service/src";
@@ -148,6 +150,8 @@ export const ProtectionService = {
 
             await Promise.all([
               ProtectionService.syncBrowserConfigs(),
+              ProtectionService.syncReelsConfigs(),
+              ProtectionService.syncNsfwApps(),
               BlocklistService.syncKeywordsToNative(),
               BlocklistService.syncAppsToNative(),
               FreedomAccessibility.updateOverlayTheme(themeJson),
@@ -183,6 +187,38 @@ export const ProtectionService = {
         "[ProtectionService] Failed to sync Accessibility configs:",
         e,
       );
+    }
+  },
+
+  syncReelsConfigs: async (): Promise<void> => {
+    try {
+      const { enabledReelsApps } = useBlockingStore.getState();
+      const enabled = REELS_APPS.filter((a) =>
+        enabledReelsApps.includes(a.packageName),
+      );
+      await FreedomAccessibility.updateReelsConfigs(
+        enabled.map((a) => ({
+          name: a.name,
+          packageName: a.packageName,
+          detectionNodes: a.detectionNodes,
+        })),
+      );
+    } catch (e) {
+      console.warn("[ProtectionService] Failed to sync Reels configs:", e);
+    }
+  },
+
+  syncNsfwApps: async (): Promise<void> => {
+    try {
+      const { enabledNsfwApps } = useBlockingStore.getState();
+      const enabled = NSFW_APPS.filter((a) =>
+        enabledNsfwApps.includes(a.packageName),
+      );
+      await FreedomAccessibility.updateNsfwMonitoredApps(
+        enabled.map((a) => a.packageName),
+      );
+    } catch (e) {
+      console.warn("[ProtectionService] Failed to sync NSFW apps:", e);
     }
   },
 
