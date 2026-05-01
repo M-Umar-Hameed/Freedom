@@ -13,6 +13,7 @@
     "mobile:unused": "npm --prefix mobile run unused",
     "desktop:ui:dev": "npm --prefix desktop/ui run tauri dev",
     "desktop:ui:build": "npm --prefix desktop/ui run tauri build",
-    "desktop:rust:test": "cargo test --manifest-path desktop/Cargo.toml"
+    "desktop:rust:test": "cargo test --manifest-path desktop/Cargo.toml",
+    "desktop:agent:check": "cargo run --manifest-path desktop/Cargo.toml -p libreascent-agent -- check-domain example.com"
   }
 }
