@@ -8,16 +8,18 @@ pub struct DomainBlocklist {
 
 impl DomainBlocklist {
     pub fn new(blocked: impl IntoIterator<Item = String>, allowed: impl IntoIterator<Item = String>) -> Self {
-        let blocked = blocked
-            .into_iter()
-            .filter_map(|domain| normalize_domain(&domain))
-            .collect();
-        let allowed = allowed
-            .into_iter()
-            .filter_map(|domain| normalize_domain(&domain))
-            .collect();
+        let mut this = Self::default();
+        this.extend_blocked(blocked);
+        this.extend_allowed(allowed);
+        this
+    }
 
-        Self { blocked, allowed }
+    pub fn extend_blocked(&mut self, domains: impl IntoIterator<Item = String>) {
+        self.blocked.extend(domains.into_iter().filter_map(|d| normalize_domain(&d)));
+    }
+
+    pub fn extend_allowed(&mut self, domains: impl IntoIterator<Item = String>) {
+        self.allowed.extend(domains.into_iter().filter_map(|d| normalize_domain(&d)));
     }
 
     pub fn is_blocked(&self, domain: &str) -> bool {
@@ -35,18 +37,69 @@ impl DomainBlocklist {
 
 pub fn normalize_domain(input: &str) -> Option<String> {
     let trimmed = input.trim().to_ascii_lowercase();
-    let domain = trimmed
+
+    // Skip comments and empty lines
+    if trimmed.is_empty()
+        || trimmed.starts_with('#')
+        || trimmed.starts_with('!')
+        || trimmed.starts_with('[')
+    {
+        return None;
+    }
+
+    let mut domain: &str = &trimmed;
+
+    // Handle hosts file format (0.0.0.0 domain or 127.0.0.1 domain)
+    if domain.starts_with("0.0.0.0 ") || domain.starts_with("127.0.0.1 ") {
+        domain = domain.split_whitespace().nth(1).unwrap_or("");
+    }
+
+    // Skip AdBlock/uBlock filters that aren't simple domain blocks
+    if domain.contains("##") || domain.contains("#?#") || domain.starts_with("@@") {
+        return None;
+    }
+
+    // Remove inline comments
+    if let Some(idx) = domain.find('#') {
+        domain = domain[..idx].trim();
+    }
+
+    // Handle AdBlock ||domain^ syntax
+    if domain.starts_with("||") {
+        domain = &domain[2..];
+    }
+    if let Some(idx) = domain.find('^') {
+        domain = &domain[..idx];
+    }
+    if let Some(idx) = domain.find('$') {
+        domain = &domain[..idx];
+    }
+
+    // Strip protocols and paths/ports
+    let domain = domain
         .trim_start_matches("http://")
         .trim_start_matches("https://")
-        .trim_end_matches('.');
+        .split('/')
+        .next()
+        .unwrap_or("")
+        .split(':')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches('.')
+        .trim();
 
-    let host = domain.split('/').next().unwrap_or("").trim();
-
-    if host.is_empty() || host.contains(' ') {
+    if domain.is_empty() || domain.contains(' ') || !domain.contains('.') {
         None
     } else {
-        Some(host.to_string())
+        Some(domain.to_string())
     }
+}
+
+pub fn parse_domain_list(content: &str) -> Vec<String> {
+    content
+        .lines()
+        .filter_map(|line| normalize_domain(line))
+        .collect()
 }
 
 fn matches_domain_set(domain: &str, set: &HashSet<String>) -> bool {
@@ -74,6 +127,22 @@ mod tests {
         assert_eq!(normalize_domain(" HTTPS://Sub.Example.COM/path "), Some("sub.example.com".to_string()));
         assert_eq!(normalize_domain("example.com."), Some("example.com".to_string()));
         assert_eq!(normalize_domain("bad domain.com"), None);
+        assert_eq!(normalize_domain("0.0.0.0 example.com"), Some("example.com".to_string()));
+        assert_eq!(normalize_domain("||example.com^"), Some("example.com".to_string()));
+        assert_eq!(normalize_domain("# comment"), None);
+    }
+
+    #[test]
+    fn parses_domain_list() {
+        let content = "
+# Comment
+example.com
+0.0.0.0 sub.example.com
+||blocked.org^
+invalid-no-dot
+";
+        let domains = parse_domain_list(content);
+        assert_eq!(domains, vec!["example.com", "sub.example.com", "blocked.org"]);
     }
 
     #[test]

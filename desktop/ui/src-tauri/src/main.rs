@@ -1,5 +1,4 @@
-use libreascent_shared::blocklist::DomainBlocklist;
-use libreascent_shared::config::{default_config, default_config_path};
+use libreascent_shared::config::default_config_path;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -23,8 +22,7 @@ fn get_status() -> DesktopStatus {
 
 #[tauri::command]
 fn test_domain(domain: String) -> bool {
-    let config = default_config();
-    let blocklist = DomainBlocklist::new(config.included_domains, config.excluded_domains);
+    let blocklist = libreascent_shared::config::load_blocklist(&default_config_path());
     blocklist.is_blocked(&domain)
 }
 

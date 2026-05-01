@@ -20,8 +20,7 @@ pub async fn run_local_dns_proxy(config_path: PathBuf, bind_addr: &str) -> Resul
     loop {
         let (size, peer) = socket.recv_from(&mut buffer).await.context("failed to receive DNS packet")?;
         let request = &buffer[..size];
-        let config = config_loader::load_or_create(&config_path)?;
-        let blocklist = DomainBlocklist::new(config.included_domains, config.excluded_domains);
+        let blocklist = config_loader::load_blocklist(&config_path);
 
         if let Some(response) = build_block_response_if_needed(request, &blocklist)? {
             socket.send_to(&response, peer).await.context("failed to send blocked DNS response")?;
