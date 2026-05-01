@@ -1,0 +1,8 @@
+[workspace]
+members = ["shared", "agent", "ui/src-tauri"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "GPL-3.0"
+repository = "https://github.com/M-Umar-Hameed/LibreAscent"
