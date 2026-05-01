@@ -124,9 +124,9 @@ JS -> Native:       Expo Module function calls (config, start/stop)
 We welcome contributions of all kinds!
 
 - **New Browsers:** Add URL bar resource IDs to `constants/browsers.ts`.
-- **Blocked Lists:** Add domains or keywords to the `data/` directory.
+- **Blocked Lists:** Add domains or keywords to the `mobile/data/` directory.
 
-Please read our [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Please keep pull requests focused and include relevant testing notes.
 
 ## License
 
