@@ -52,18 +52,18 @@ app-example
 /android
 
 # local expo modules build artifacts
-modules/*/android/build/
-modules/*/android/.gradle/
-modules/*/android/.cxx/
-modules/*/ios/build/
-modules/*/ios/Pods/
-modules/*/ios/*.xcworkspace/
+mobile/modules/*/android/build/
+mobile/modules/*/android/.gradle/
+mobile/modules/*/android/.cxx/
+mobile/modules/*/ios/build/
+mobile/modules/*/ios/Pods/
+mobile/modules/*/ios/*.xcworkspace/
 
 # Freedom specific
-data/domains/custom/*.txt
-data/keywords/custom/*.txt
-!data/domains/custom/.gitkeep
-!data/keywords/custom/.gitkeep
+mobile/data/domains/custom/*.txt
+mobile/data/keywords/custom/*.txt
+!mobile/data/domains/custom/.gitkeep
+!mobile/data/keywords/custom/.gitkeep
 CLAUDE.md
 /.agent
 /.claude

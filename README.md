@@ -40,7 +40,7 @@ LibreAscent/
     modules/              # Custom Expo Native Modules
     services/             # Business logic
     stores/               # Zustand state
-    mobile/data/          # Domain and keyword blocklists
+    data/                 # Domain and keyword blocklists
   desktop/                # Windows Tauri app
   shared/                 # Cross-platform schemas and shared rule assets
   docs/                   # Specs, plans, and architecture notes
