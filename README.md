@@ -34,20 +34,16 @@ LibreAscent doesn't just block URLs; it secures your device across multiple laye
 
 ```
 LibreAscent/
-  app/                    # Expo Router screens (Dashboard, Keywords, Sites, Apps, Settings, etc.)
-  components/             # UI components (Atomic design)
-  modules/                # 5 Custom Expo Native Modules (Kotlin)
-    freedom-vpn-service/          # Local VPN for DNS blocking
-    freedom-accessibility-service/ # Browser URL + Settings protection
-    freedom-overlay/              # Full-screen "Stay Away" overlay
-    freedom-foreground-service/   # Persistent background service + boot receiver
-    freedom-device-admin/         # Uninstall protection via Device Admin
-  services/               # Business logic (ProtectionService, BlocklistService)
-  stores/                 # Zustand state (useAppStore, useBlockingStore, useOnboardingStore)
-  constants/              # Browser configs, permissions
-  data/                   # Domain and keyword blocklists (.txt files)
-  hooks/                  # usePermissions, useColorScheme
-  types/                  # TypeScript type definitions
+  mobile/                 # Expo Android app
+    app/                  # Expo Router screens
+    components/           # UI components
+    modules/              # Custom Expo Native Modules
+    services/             # Business logic
+    stores/               # Zustand state
+    data/                 # Domain and keyword blocklists
+  desktop/                # Windows Tauri app
+  shared/                 # Cross-platform schemas and shared rule assets
+  docs/                   # Specs, plans, and architecture notes
 ```
 
 ### Blocking Flows
@@ -93,7 +89,7 @@ JS -> Native:       Expo Module function calls (config, start/stop)
 2. Install dependencies:
 
    ```bash
-   npm install
+   npm --prefix mobile install
    ```
 
 3. Generate the native Android project:
@@ -104,7 +100,14 @@ JS -> Native:       Expo Module function calls (config, start/stop)
 
 4. Run on your device:
    ```bash
-   npx expo run:android
+   npm --prefix mobile run android
+   ```
+
+   Root shortcuts are also available:
+
+   ```bash
+   npm run mobile:android
+   npm run mobile:typecheck
    ```
 
 ## Tech Stack
