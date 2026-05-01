@@ -9,6 +9,15 @@ dist/
 web-build/
 expo-env.d.ts
 
+# nested app dependencies and builds
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+desktop/ui/node_modules/
+desktop/ui/dist/
+desktop/target/
+
 # Native
 .kotlin/
 *.orig.*
