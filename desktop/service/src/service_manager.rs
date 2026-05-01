@@ -1,0 +1,126 @@
+use std::ffi::OsString;
+use std::time::Duration;
+use std::path::PathBuf;
+use windows_service::{
+    define_windows_service,
+    service::{
+        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+        ServiceType, ServiceInfo, ServiceStartType, ServiceErrorControl, ServiceAccess,
+        ServiceDependency,
+    },
+    service_control_handler::{self, ServiceControlHandlerResult},
+    service_manager::{ServiceManager, ServiceManagerAccess},
+};
+
+pub const SERVICE_NAME: &str = "LibreAscentService";
+pub const SERVICE_DISPLAY_NAME: &str = "LibreAscent Background Service";
+
+define_windows_service!(ffi_service_main, libre_ascent_service_main);
+
+pub fn run_service() -> anyhow::Result<()> {
+    windows_service::service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
+    Ok(())
+}
+
+fn libre_ascent_service_main(_arguments: Vec<OsString>) {
+    if let Err(_e) = run_service_loop() {
+        // Log error?
+    }
+}
+
+fn run_service_loop() -> anyhow::Result<()> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+    let event_handler = move |control_event| -> ServiceControlHandlerResult {
+        match control_event {
+            ServiceControl::Stop => {
+                let _ = tx.blocking_send(());
+                ServiceControlHandlerResult::NoError
+            }
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+            _ => ServiceControlHandlerResult::NotImplemented,
+        }
+    };
+
+    let status_handle = service_control_handler::register(SERVICE_NAME, event_handler)?;
+
+    status_handle.set_service_status(ServiceStatus {
+        service_type: ServiceType::OWN_PROCESS,
+        current_state: ServiceState::Running,
+        controls_accepted: ServiceControlAccept::STOP,
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    })?;
+
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async {
+        // Start DNS proxy in background
+        let config_path = libreascent_shared::config::default_config_path();
+        
+        tokio::spawn(async move {
+            if let Err(_e) = crate::dns::run_local_dns_proxy(config_path, "127.0.0.1:53").await {
+                // Log error
+            }
+        });
+
+        // Wait for stop signal
+        rx.recv().await;
+    });
+
+    status_handle.set_service_status(ServiceStatus {
+        service_type: ServiceType::OWN_PROCESS,
+        current_state: ServiceState::Stopped,
+        controls_accepted: ServiceControlAccept::empty(),
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    })?;
+
+    Ok(())
+}
+
+pub fn install_service() -> anyhow::Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE)?;
+    let exe_path = std::env::current_exe()?;
+
+    let info = ServiceInfo {
+        name: OsString::from(SERVICE_NAME),
+        display_name: OsString::from(SERVICE_DISPLAY_NAME),
+        service_type: ServiceType::OWN_PROCESS,
+        start_type: ServiceStartType::AutoStart,
+        error_control: ServiceErrorControl::Normal,
+        executable_path: exe_path,
+        launch_arguments: vec![OsString::from("service-run")],
+        dependencies: Vec::new(),
+        account_name: None,
+        account_password: None,
+    };
+
+    let _service = manager.create_service(&info, ServiceAccess::QUERY_STATUS)?;
+
+    Ok(())
+}
+
+pub fn uninstall_service() -> anyhow::Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS | ServiceAccess::DELETE)?;
+    service.delete()?;
+    Ok(())
+}
+
+pub fn start_service() -> anyhow::Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::START)?;
+    service.start(&Vec::<OsString>::new())?;
+    Ok(())
+}
+
+pub fn stop_service() -> anyhow::Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::STOP | ServiceAccess::QUERY_STATUS)?;
+    service.stop()?;
+    Ok(())
+}

@@ -6,6 +6,7 @@ type DesktopStatus = {
   serviceRunning: boolean;
   dnsProxyRunning: boolean;
   configPath: string;
+  isAdmin: boolean;
 };
 
 type DomainResult = "idle" | "blocked" | "allowed" | "error";
@@ -14,11 +15,18 @@ export function App() {
   const [status, setStatus] = useState<DesktopStatus | null>(null);
   const [domain, setDomain] = useState("example.com");
   const [domainResult, setDomainResult] = useState<DomainResult>("idle");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const refreshStatus = () => {
     invoke<DesktopStatus>("get_status")
       .then(setStatus)
       .catch(() => setStatus(null));
+  };
+
+  useEffect(() => {
+    refreshStatus();
+    const interval = setInterval(refreshStatus, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   async function testDomain() {
@@ -28,6 +36,18 @@ export function App() {
       setDomainResult(blocked ? "blocked" : "allowed");
     } catch {
       setDomainResult("error");
+    }
+  }
+
+  async function runAction(cmd: string) {
+    setLoading(true);
+    try {
+      await invoke(cmd);
+      refreshStatus();
+    } catch (e) {
+      alert(`Action failed: ${e}`);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -46,10 +66,38 @@ export function App() {
             <dd>{status?.serviceRunning ? "Yes" : "No"}</dd>
           </div>
           <div>
-            <dt>DNS proxy</dt>
-            <dd>{status?.dnsProxyRunning ? "Running" : "Stopped"}</dd>
+            <dt>Admin rights</dt>
+            <dd>{status?.isAdmin ? "Yes" : "No"}</dd>
           </div>
         </dl>
+
+        <div className="actions-row">
+          {!status?.serviceInstalled ? (
+            <button disabled={loading} onClick={() => runAction("install_service")}>
+              Install Service
+            </button>
+          ) : (
+            <>
+              {!status?.serviceRunning ? (
+                <button disabled={loading} onClick={() => runAction("start_service")}>
+                  Start Service
+                </button>
+              ) : (
+                <button disabled={loading} onClick={() => runAction("stop_service")}>
+                  Stop Service
+                </button>
+              )}
+              <button
+                disabled={loading}
+                className="btn-danger"
+                onClick={() => runAction("uninstall_service")}
+              >
+                Uninstall
+              </button>
+            </>
+          )}
+        </div>
+
         <p className="path">
           {status?.configPath ?? "Config path unavailable"}
         </p>

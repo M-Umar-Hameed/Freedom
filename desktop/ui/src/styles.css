@@ -67,6 +67,16 @@ dd {
   word-break: break-all;
 }
 
+.actions-row {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0 0;
+}
+
+.btn-danger {
+  background: #6f1f1f !important;
+}
+
 .domain-row {
   display: grid;
   grid-template-columns: 1fr auto;

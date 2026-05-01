@@ -9,6 +9,9 @@ repository.workspace = true
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+is_elevated = "0.1"
 libreascent-shared = { path = "../../shared" }
+runas = "1"
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = [] }
+windows-service = "0.8"
