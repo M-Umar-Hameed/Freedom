@@ -33,6 +33,7 @@ interface FreedomAccessibilityModuleInterface {
     }[],
   ): Promise<void>;
   updateWhitelist(domains: string[]): Promise<void>;
+  updateNsfwMonitoredApps(packageNames: string[]): Promise<void>;
   updateAdultBlockingEnabled(enabled: boolean): Promise<void>;
   updateHardcoreMode(enabled: boolean): Promise<void>;
   updateCategoryDomains(categoryId: string, domains: string[]): Promise<void>;
