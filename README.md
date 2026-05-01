@@ -95,11 +95,13 @@ JS -> Native:       Expo Module function calls (config, start/stop)
 3. Generate the native Android project:
 
    ```bash
+   cd mobile
    npx expo prebuild
    ```
 
 4. Run on your device:
    ```bash
+   cd ..
    npm --prefix mobile run android
    ```
 
