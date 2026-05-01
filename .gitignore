@@ -58,5 +58,6 @@ data/keywords/custom/*.txt
 CLAUDE.md
 /.agent
 /.claude
+/.worktrees
 CONTRIBUTING.md
 
