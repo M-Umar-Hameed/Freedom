@@ -26,6 +26,7 @@ async fn main() -> Result<()> {
         Some("run-dns") => {
             dns::run_local_dns_proxy(default_config_path(), "127.0.0.1:53").await?;
         }
+
         Some("install") => {
             service_manager::install_service()?;
             println!("Service installed.");

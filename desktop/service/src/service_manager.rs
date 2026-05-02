@@ -54,10 +54,12 @@ fn run_service_loop() -> anyhow::Result<()> {
 
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
-        // Set system DNS
+        // DNS management DISABLED by default during development to avoid internet breakage
+        /*
         if let Err(_e) = crate::dns_manager::set_system_dns("127.0.0.1") {
             // Log error
         }
+        */
 
         // Start DNS proxy in background
         let config_path = libreascent_shared::config::default_config_path();
@@ -68,7 +70,8 @@ fn run_service_loop() -> anyhow::Result<()> {
             }
         });
 
-        // Start DNS monitor
+        // DNS monitor DISABLED by default
+        /*
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(30));
             loop {
@@ -78,13 +81,12 @@ fn run_service_loop() -> anyhow::Result<()> {
                         crate::dns_manager::log_tamper_event("DNS settings tampered. Restoring...");
                         let _ = crate::dns_manager::set_system_dns("127.0.0.1");
                     }
-                    Err(_e) => {
-                        // Log error
-                    }
+                    Err(_e) => {}
                     _ => {}
                 }
             }
         });
+        */
 
         // Start App blocker
         tokio::spawn(async move {
@@ -158,7 +160,16 @@ pub fn install_service() -> anyhow::Result<()> {
 
 pub fn uninstall_service() -> anyhow::Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS | ServiceAccess::DELETE)?;
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE)?;
+    
+    let status = service.query_status()?;
+    if status.current_state != ServiceState::Stopped {
+        println!("Stopping service before uninstall...");
+        let _ = service.stop();
+        // Give it a moment to stop
+        std::thread::sleep(Duration::from_secs(2));
+    }
+
     service.delete()?;
     Ok(())
 }

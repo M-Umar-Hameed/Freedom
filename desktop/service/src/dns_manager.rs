@@ -29,19 +29,21 @@ pub fn log_tamper_event(message: &str) {
 }
 
 pub fn reset_system_dns() -> Result<()> {
-    let interfaces = get_connected_interfaces()?;
-    for interface in interfaces {
-        println!("Resetting DNS for interface {} to DHCP", interface);
-        let status = Command::new("netsh")
-            .args(&["interface", "ipv4", "set", "dnsservers", &format!("name=\"{}\"", interface), "dhcp"])
-            .status()
-            .with_context(|| format!("failed to reset DNS for {}", interface))?;
-        
-        if !status.success() {
-            // Some interfaces might not support DHCP for DNS, but we try
-            println!("Warning: Failed to reset DNS for {} to DHCP", interface);
+    // Try netsh first
+    if let Ok(interfaces) = get_connected_interfaces() {
+        for interface in interfaces {
+            let _ = Command::new("netsh")
+                .args(&["interface", "ipv4", "set", "dnsservers", &format!("name=\"{}\"", interface), "dhcp"])
+                .status();
         }
     }
+
+    // Always follow up with a broad PowerShell reset as a fallback/safety measure
+    // This requires admin, same as netsh
+    let _ = Command::new("powershell")
+        .args(&["-NoProfile", "-Command", "Get-NetAdapter | where {$_.Status -eq 'Up'} | Set-DnsClientServerAddress -ResetServerAddresses"])
+        .status();
+
     Ok(())
 }
 

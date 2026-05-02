@@ -16,6 +16,7 @@
     "desktop:rust:test": "cargo test --manifest-path desktop/Cargo.toml",
     "desktop:service:check": "cargo run --manifest-path desktop/Cargo.toml -p libreascent-service -- check-domain",
     "desktop:service:update": "cargo run --manifest-path desktop/Cargo.toml -p libreascent-service -- update-sources",
+    "desktop:service:reset-dns": "cargo run --manifest-path desktop/Cargo.toml -p libreascent-service -- reset-dns",
     "desktop:dist": "npm --prefix desktop/ui run tauri build"
   }
 }

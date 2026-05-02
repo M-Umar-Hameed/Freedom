@@ -8,7 +8,7 @@ use tokio::net::UdpSocket;
 
 use crate::config_loader;
 
-const UPSTREAM_DNS: &str = "1.1.1.1:53";
+const UPSTREAM_DNS: &str = "1.1.1.3:53";
 
 pub async fn run_local_dns_proxy(config_path: PathBuf, bind_addr: &str) -> Result<()> {
     let bind: SocketAddr = bind_addr.parse().context("invalid DNS bind address")?;
