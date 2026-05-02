@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ControlMode {
     Flexible,
     Locked,
@@ -9,12 +10,14 @@ pub enum ControlMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FrictionConfig {
     pub countdown_seconds: u32,
     pub click_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BlocklistSource {
     pub id: String,
     pub name: String,
@@ -24,6 +27,7 @@ pub struct BlocklistSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopConfig {
     pub schema_version: u32,
     pub adult_blocking_enabled: bool,
@@ -37,6 +41,7 @@ pub struct DesktopConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BlockedAppRule {
     pub name: String,
     pub executable: String,

@@ -1,12 +1,10 @@
 use std::ffi::OsString;
 use std::time::Duration;
-use std::path::PathBuf;
 use windows_service::{
     define_windows_service,
     service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType, ServiceInfo, ServiceStartType, ServiceErrorControl, ServiceAccess,
-        ServiceDependency,
     },
     service_control_handler::{self, ServiceControlHandlerResult},
     service_manager::{ServiceManager, ServiceManagerAccess},
