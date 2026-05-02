@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FrictionGuard } from "./FrictionGuard";
+import logo from "./assets/logo.png";
 
 type BlockedAppRule = {
   name: string;
@@ -145,8 +146,13 @@ export function App() {
   return (
     <main className="shell">
       <section className="panel">
-        <p className="eyebrow">LibreAscent Desktop</p>
-        <h1>Windows protection</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <img src={logo} alt="LibreAscent" style={{ width: '40px', height: '40px' }} />
+          <div>
+            <p className="eyebrow" style={{ margin: 0 }}>LibreAscent Desktop</p>
+            <h1 style={{ margin: 0 }}>Windows protection</h1>
+          </div>
+        </div>
         <dl className="status-grid">
           <div>
             <dt>Service installed</dt>
