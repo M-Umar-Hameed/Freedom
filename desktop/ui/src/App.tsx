@@ -5,6 +5,7 @@ type DesktopStatus = {
   serviceInstalled: boolean;
   serviceRunning: boolean;
   dnsProxyRunning: boolean;
+  dnsControlled: boolean;
   configPath: string;
   isAdmin: boolean;
 };
@@ -66,8 +67,8 @@ export function App() {
             <dd>{status?.serviceRunning ? "Yes" : "No"}</dd>
           </div>
           <div>
-            <dt>Admin rights</dt>
-            <dd>{status?.isAdmin ? "Yes" : "No"}</dd>
+            <dt>System DNS</dt>
+            <dd>{status?.dnsControlled ? "Managed" : "External"}</dd>
           </div>
         </dl>
 

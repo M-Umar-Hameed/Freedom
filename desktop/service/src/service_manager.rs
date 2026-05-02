@@ -56,17 +56,42 @@ fn run_service_loop() -> anyhow::Result<()> {
 
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
+        // Set system DNS
+        if let Err(_e) = crate::dns_manager::set_system_dns("127.0.0.1") {
+            // Log error
+        }
+
         // Start DNS proxy in background
         let config_path = libreascent_shared::config::default_config_path();
         
         tokio::spawn(async move {
-            if let Err(_e) = crate::dns::run_local_dns_proxy(config_path, "127.0.0.1:53").await {
+            if let Err(_e) = crate::dns::run_local_dns_proxy(config_path.clone(), "127.0.0.1:53").await {
                 // Log error
+            }
+        });
+
+        // Start DNS monitor
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                match crate::dns_manager::is_dns_set_correctly("127.0.0.1") {
+                    Ok(false) => {
+                        let _ = crate::dns_manager::set_system_dns("127.0.0.1");
+                    }
+                    Err(_e) => {
+                        // Log error
+                    }
+                    _ => {}
+                }
             }
         });
 
         // Wait for stop signal
         rx.recv().await;
+
+        // Reset system DNS on stop
+        let _ = crate::dns_manager::reset_system_dns();
     });
 
     status_handle.set_service_status(ServiceStatus {

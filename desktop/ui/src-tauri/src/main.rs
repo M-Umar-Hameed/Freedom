@@ -12,8 +12,22 @@ struct DesktopStatus {
     service_installed: bool,
     service_running: bool,
     dns_proxy_running: bool,
+    dns_controlled: bool,
     config_path: String,
     is_admin: bool,
+}
+
+fn check_dns_control() -> bool {
+    let output = Command::new("netsh")
+        .args(&["interface", "ipv4", "show", "dnsservers"])
+        .output();
+    
+    if let Ok(output) = output {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        stdout.contains("127.0.0.1")
+    } else {
+        false
+    }
 }
 
 fn get_service_path() -> PathBuf {
@@ -85,6 +99,7 @@ fn get_status() -> DesktopStatus {
         service_installed: installed,
         service_running: running,
         dns_proxy_running: running,
+        dns_controlled: check_dns_control(),
         config_path: default_config_path().to_string_lossy().to_string(),
         is_admin: is_elevated(),
     }

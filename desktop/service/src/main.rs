@@ -2,6 +2,7 @@ mod config_loader;
 mod dns;
 mod updater;
 mod service_manager;
+mod dns_manager;
 
 use anyhow::{bail, Result};
 use libreascent_shared::config::default_config_path;
@@ -22,7 +23,7 @@ async fn main() -> Result<()> {
             updater::update_sources(&default_config_path()).await?;
         }
         Some("run-dns") => {
-            dns::run_local_dns_proxy(default_config_path(), "127.0.0.1:5353").await?;
+            dns::run_local_dns_proxy(default_config_path(), "127.0.0.1:53").await?;
         }
         Some("install") => {
             service_manager::install_service()?;
@@ -40,6 +41,14 @@ async fn main() -> Result<()> {
             service_manager::stop_service()?;
             println!("Service stopped.");
         }
+        Some("set-dns") => {
+            dns_manager::set_system_dns("127.0.0.1")?;
+            println!("System DNS set to 127.0.0.1.");
+        }
+        Some("reset-dns") => {
+            dns_manager::reset_system_dns()?;
+            println!("System DNS reset to DHCP.");
+        }
         Some("service-run") => {
             service_manager::run_service()?;
         }
@@ -50,6 +59,8 @@ async fn main() -> Result<()> {
             println!("  libreascent-service run-dns");
             println!("  libreascent-service install");
             println!("  libreascent-service uninstall");
+            println!("  libreascent-service set-dns");
+            println!("  libreascent-service reset-dns");
         }
     }
 
