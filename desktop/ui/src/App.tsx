@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { FrictionGuard } from "./FrictionGuard";
 
 type BlockedAppRule = {
   name: string;
@@ -8,6 +9,11 @@ type BlockedAppRule = {
 
 type DesktopConfig = {
   blockedApps: BlockedAppRule[];
+  controlMode: "Flexible" | "Locked" | "Hardcore";
+  friction: {
+    countdownSeconds: number;
+    clickCount: number;
+  };
 };
 
 type DesktopStatus = {
@@ -28,6 +34,10 @@ export function App() {
   const [newApp, setNewApp] = useState("");
   const [domainResult, setDomainResult] = useState<DomainResult>("idle");
   const [loading, setLoading] = useState(false);
+  const [frictionTarget, setFrictionTarget] = useState<{
+    cmd: string;
+    title: string;
+  } | null>(null);
 
   const refreshStatus = () => {
     invoke<DesktopStatus>("get_status")
@@ -58,7 +68,12 @@ export function App() {
     }
   }
 
-  async function runAction(cmd: string) {
+  async function runAction(cmd: string, title?: string) {
+    if (config?.controlMode !== "Flexible" && title) {
+      setFrictionTarget({ cmd, title });
+      return;
+    }
+
     setLoading(true);
     try {
       await invoke(cmd);
@@ -87,6 +102,10 @@ export function App() {
 
   async function removeApp(exe: string) {
     if (!config) return;
+    if (config.controlMode !== "Flexible") {
+      alert("Control Mode prevents removing rules directly.");
+      return;
+    }
     const updated = {
       ...config,
       blockedApps: config.blockedApps.filter((a) => a.executable !== exe),
@@ -97,6 +116,30 @@ export function App() {
     } catch (e) {
       alert(e);
     }
+  }
+
+  if (frictionTarget && config) {
+    return (
+      <FrictionGuard
+        title={frictionTarget.title}
+        countdownSeconds={config.friction.countdownSeconds}
+        clickCount={config.friction.clickCount}
+        onCancel={() => setFrictionTarget(null)}
+        onSuccess={async () => {
+          const cmd = frictionTarget.cmd;
+          setFrictionTarget(null);
+          setLoading(true);
+          try {
+            await invoke(cmd);
+            refreshStatus();
+          } catch (e) {
+            alert(e);
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
+    );
   }
 
   return (
@@ -131,23 +174,31 @@ export function App() {
                   Start Service
                 </button>
               ) : (
-                <button disabled={loading} onClick={() => runAction("stop_service")}>
+                <button
+                  disabled={loading}
+                  onClick={() => runAction("stop_service", "Stop Protection")}
+                >
                   Stop Service
                 </button>
               )}
               <button
                 disabled={loading}
                 className="btn-danger"
-                onClick={() => runAction("uninstall_service")}
+                onClick={() => runAction("uninstall_service", "Uninstall Protection")}
               >
                 Uninstall
               </button>
             </>
           )}
+          <button disabled={loading} onClick={() => invoke("show_overlay")}>
+            Preview Overlay
+          </button>
         </div>
 
         <p className="path">
           {status?.configPath ?? "Config path unavailable"}
+          <br />
+          Mode: {config?.controlMode ?? "Unknown"}
         </p>
       </section>
 

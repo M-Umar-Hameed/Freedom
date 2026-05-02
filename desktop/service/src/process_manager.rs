@@ -1,12 +1,13 @@
 use sysinfo::System;
 use libreascent_shared::config::DesktopConfig;
 
-pub fn check_and_block_apps(config: &DesktopConfig) {
+pub fn check_and_block_apps(config: &DesktopConfig) -> bool {
     if config.blocked_apps.is_empty() {
-        return;
+        return false;
     }
 
     let sys = System::new_all();
+    let mut blocked_any = false;
 
     for (pid, process) in sys.processes() {
         let exe_name = process.name().to_string_lossy().to_lowercase();
@@ -27,7 +28,10 @@ pub fn check_and_block_apps(config: &DesktopConfig) {
             if matched {
                 println!("Blocking app: {} (PID: {:?})", exe_name, pid);
                 let _ = process.kill();
+                blocked_any = true;
             }
         }
     }
+
+    blocked_any
 }

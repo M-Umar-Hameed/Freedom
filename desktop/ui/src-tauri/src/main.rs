@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use is_elevated::is_elevated;
 use windows_service::service::{ServiceAccess, ServiceState};
 use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+use tauri::{Emitter, Manager};
+use tokio::net::UdpSocket;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -141,8 +143,39 @@ fn test_domain(domain: String) -> bool {
     blocklist.is_blocked(&domain)
 }
 
+#[tauri::command]
+fn show_overlay(handle: tauri::AppHandle) {
+    if let Some(window) = handle.get_webview_window("overlay") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let socket_res: Result<UdpSocket, std::io::Error> = UdpSocket::bind("127.0.0.1:13370").await;
+                if let Ok(socket) = socket_res {
+                    let mut buffer = [0u8; 1024];
+                    loop {
+                        if let Ok((size, _)) = socket.recv_from(&mut buffer).await {
+                            let msg = String::from_utf8_lossy(&buffer[..size]);
+                            if msg.starts_with("block:") {
+                                let _ = handle.emit("block-event", msg);
+                                // Show overlay window automatically
+                                if let Some(window) = handle.get_webview_window("overlay") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_status,
             test_domain,
@@ -151,7 +184,8 @@ fn main() {
             start_service,
             stop_service,
             get_config,
-            update_config
+            update_config,
+            show_overlay
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LibreAscent Desktop");

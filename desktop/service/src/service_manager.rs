@@ -77,6 +77,7 @@ fn run_service_loop() -> anyhow::Result<()> {
                 interval.tick().await;
                 match crate::dns_manager::is_dns_set_correctly("127.0.0.1") {
                     Ok(false) => {
+                        crate::dns_manager::log_tamper_event("DNS settings tampered. Restoring...");
                         let _ = crate::dns_manager::set_system_dns("127.0.0.1");
                     }
                     Err(_e) => {
@@ -90,11 +91,19 @@ fn run_service_loop() -> anyhow::Result<()> {
         // Start App blocker
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
+            let broadcast_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.ok();
+            
             loop {
                 interval.tick().await;
                 let config_path = libreascent_shared::config::default_config_path();
                 if let Ok(config) = libreascent_shared::config::load_or_create(&config_path) {
-                    crate::process_manager::check_and_block_apps(&config);
+                    let blocked = crate::process_manager::check_and_block_apps(&config);
+                    
+                    if blocked {
+                        if let Some(ref socket) = broadcast_socket {
+                            let _ = socket.send_to(b"block:app", "127.0.0.1:13370").await;
+                        }
+                    }
                 }
             }
         });
@@ -102,8 +111,16 @@ fn run_service_loop() -> anyhow::Result<()> {
         // Wait for stop signal
         rx.recv().await;
 
-        // Reset system DNS on stop
-        let _ = crate::dns_manager::reset_system_dns();
+        // Reset system DNS on stop, unless Hardcore
+        let config_path = libreascent_shared::config::default_config_path();
+        let config = libreascent_shared::config::load_or_create(&config_path).ok();
+        let is_hardcore = config.map(|c| c.control_mode == libreascent_shared::config::ControlMode::Hardcore).unwrap_or(false);
+
+        if !is_hardcore {
+            let _ = crate::dns_manager::reset_system_dns();
+        } else {
+            crate::dns_manager::log_tamper_event("Service stopped in Hardcore mode. DNS NOT reset.");
+        }
     });
 
     status_handle.set_service_status(ServiceStatus {

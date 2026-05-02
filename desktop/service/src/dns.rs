@@ -15,6 +15,7 @@ pub async fn run_local_dns_proxy(config_path: PathBuf, bind_addr: &str) -> Resul
     let upstream: SocketAddr = UPSTREAM_DNS.parse().context("invalid upstream DNS address")?;
     let socket = UdpSocket::bind(bind).await.context("failed to bind DNS proxy")?;
     let upstream_socket = UdpSocket::bind("0.0.0.0:0").await.context("failed to bind upstream DNS socket")?;
+    let broadcast_socket = UdpSocket::bind("127.0.0.1:0").await.ok();
     let mut buffer = vec![0_u8; 4096];
 
     loop {
@@ -24,6 +25,10 @@ pub async fn run_local_dns_proxy(config_path: PathBuf, bind_addr: &str) -> Resul
 
         if let Some(response) = build_block_response_if_needed(request, &blocklist)? {
             socket.send_to(&response, peer).await.context("failed to send blocked DNS response")?;
+            
+            if let Some(ref b_socket) = broadcast_socket {
+                let _ = b_socket.send_to(b"block:dns", "127.0.0.1:13370").await;
+            }
             continue;
         }
 

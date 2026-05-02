@@ -141,3 +141,62 @@ button {
 .result-error {
   color: #ffd166;
 }
+
+.overlay-root {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(16, 20, 24, 0.95);
+  color: #e5edf7;
+  text-align: center;
+}
+
+.overlay-content {
+  max-width: 500px;
+  padding: 40px;
+  border: 1px solid #2a3441;
+  border-radius: 12px;
+  background: #151b22;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.overlay-content h1 {
+  font-size: 32px;
+  margin: 16px 0;
+}
+
+.overlay-content .message {
+  margin: 24px 0;
+  color: #9aa8b7;
+  line-height: 1.6;
+}
+
+.btn-close {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.friction-stage {
+  padding: 24px;
+}
+
+.counter {
+  font-size: 64px;
+  font-weight: 700;
+  color: #82d4aa;
+  margin: 20px 0;
+}
+
+.btn-friction {
+  width: 100%;
+  padding: 24px;
+  font-size: 20px;
+  font-weight: 700;
+  background: #1f6f4a;
+  border: 1px solid #354254;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+}

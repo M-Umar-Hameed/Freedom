@@ -1,5 +1,8 @@
 use std::process::Command;
 use anyhow::{Result, Context, anyhow};
+use std::fs::OpenOptions;
+use std::io::Write;
+use chrono::Local;
 
 pub fn set_system_dns(addr: &str) -> Result<()> {
     let interfaces = get_connected_interfaces()?;
@@ -15,6 +18,14 @@ pub fn set_system_dns(addr: &str) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn log_tamper_event(message: &str) {
+    let path = libreascent_shared::config::default_config_path().parent().unwrap().join("tamper.log");
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let now = Local::now();
+        let _ = writeln!(file, "[{}] {}", now.format("%Y-%m-%d %H:%M:%S"), message);
+    }
 }
 
 pub fn reset_system_dns() -> Result<()> {

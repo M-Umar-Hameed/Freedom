@@ -118,6 +118,20 @@ pub fn load_blocklist(config_path: &std::path::Path) -> crate::blocklist::Domain
     blocklist
 }
 
+impl DesktopConfig {
+    pub fn requires_friction(&self) -> bool {
+        self.control_mode != ControlMode::Flexible
+    }
+
+    pub fn can_modify_rules(&self) -> bool {
+        self.control_mode == ControlMode::Flexible
+    }
+
+    pub fn tamper_log_path(&self) -> PathBuf {
+        default_config_path().parent().unwrap().join("tamper.log")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
