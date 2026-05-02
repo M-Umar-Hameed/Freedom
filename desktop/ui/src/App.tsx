@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+type BlockedAppRule = {
+  name: string;
+  executable: string;
+};
+
+type DesktopConfig = {
+  blockedApps: BlockedAppRule[];
+};
+
 type DesktopStatus = {
   serviceInstalled: boolean;
   serviceRunning: boolean;
@@ -14,7 +23,9 @@ type DomainResult = "idle" | "blocked" | "allowed" | "error";
 
 export function App() {
   const [status, setStatus] = useState<DesktopStatus | null>(null);
+  const [config, setConfig] = useState<DesktopConfig | null>(null);
   const [domain, setDomain] = useState("example.com");
+  const [newApp, setNewApp] = useState("");
   const [domainResult, setDomainResult] = useState<DomainResult>("idle");
   const [loading, setLoading] = useState(false);
 
@@ -24,8 +35,15 @@ export function App() {
       .catch(() => setStatus(null));
   };
 
+  const loadConfig = () => {
+    invoke<DesktopConfig>("get_config")
+      .then(setConfig)
+      .catch(console.error);
+  };
+
   useEffect(() => {
     refreshStatus();
+    loadConfig();
     const interval = setInterval(refreshStatus, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -49,6 +67,35 @@ export function App() {
       alert(`Action failed: ${e}`);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function addApp() {
+    if (!config || !newApp) return;
+    const updated = {
+      ...config,
+      blockedApps: [...config.blockedApps, { name: newApp, executable: newApp }],
+    };
+    try {
+      await invoke("update_config", { config: updated });
+      setConfig(updated);
+      setNewApp("");
+    } catch (e) {
+      alert(e);
+    }
+  }
+
+  async function removeApp(exe: string) {
+    if (!config) return;
+    const updated = {
+      ...config,
+      blockedApps: config.blockedApps.filter((a) => a.executable !== exe),
+    };
+    try {
+      await invoke("update_config", { config: updated });
+      setConfig(updated);
+    } catch (e) {
+      alert(e);
     }
   }
 
@@ -102,6 +149,28 @@ export function App() {
         <p className="path">
           {status?.configPath ?? "Config path unavailable"}
         </p>
+      </section>
+
+      <section className="panel">
+        <h2>Blocked apps</h2>
+        <div className="domain-row">
+          <input
+            placeholder="e.g. discord.exe"
+            value={newApp}
+            onChange={(e) => setNewApp(e.target.value)}
+          />
+          <button onClick={addApp}>Add</button>
+        </div>
+        <ul className="app-list">
+          {config?.blockedApps.map((app) => (
+            <li key={app.executable}>
+              <span>{app.executable}</span>
+              <button className="btn-link" onClick={() => removeApp(app.executable)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="panel">

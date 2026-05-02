@@ -87,6 +87,18 @@ fn run_service_loop() -> anyhow::Result<()> {
             }
         });
 
+        // Start App blocker
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            loop {
+                interval.tick().await;
+                let config_path = libreascent_shared::config::default_config_path();
+                if let Ok(config) = libreascent_shared::config::load_or_create(&config_path) {
+                    crate::process_manager::check_and_block_apps(&config);
+                }
+            }
+        });
+
         // Wait for stop signal
         rx.recv().await;
 

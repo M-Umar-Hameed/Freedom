@@ -3,6 +3,7 @@ mod dns;
 mod updater;
 mod service_manager;
 mod dns_manager;
+mod process_manager;
 
 use anyhow::{bail, Result};
 use libreascent_shared::config::default_config_path;
@@ -49,6 +50,10 @@ async fn main() -> Result<()> {
             dns_manager::reset_system_dns()?;
             println!("System DNS reset to DHCP.");
         }
+        Some("block-apps") => {
+            let config = libreascent_shared::config::load_or_create(&default_config_path())?;
+            process_manager::check_and_block_apps(&config);
+        }
         Some("service-run") => {
             service_manager::run_service()?;
         }
@@ -61,9 +66,9 @@ async fn main() -> Result<()> {
             println!("  libreascent-service uninstall");
             println!("  libreascent-service set-dns");
             println!("  libreascent-service reset-dns");
+            println!("  libreascent-service block-apps");
         }
     }
 
     Ok(())
 }
-

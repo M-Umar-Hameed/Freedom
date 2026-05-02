@@ -77,6 +77,33 @@ dd {
   background: #6f1f1f !important;
 }
 
+.btn-link {
+  border: none !important;
+  background: transparent !important;
+  color: #ff6b6b;
+  font-size: 13px;
+  padding: 0 !important;
+  text-decoration: underline;
+}
+
+.app-list {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #2a3441;
+}
+
+.app-list li:last-child {
+  border-bottom: none;
+}
+
 .domain-row {
   display: grid;
   grid-template-columns: 1fr auto;

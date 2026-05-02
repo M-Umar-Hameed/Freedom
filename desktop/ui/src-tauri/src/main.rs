@@ -1,4 +1,4 @@
-use libreascent_shared::config::default_config_path;
+use libreascent_shared::config::{default_config_path, DesktopConfig, load_or_create, save};
 use serde::Serialize;
 use std::process::Command;
 use std::path::PathBuf;
@@ -106,6 +106,16 @@ fn get_status() -> DesktopStatus {
 }
 
 #[tauri::command]
+fn get_config() -> Result<DesktopConfig, String> {
+    load_or_create(&default_config_path()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn update_config(config: DesktopConfig) -> Result<(), String> {
+    save(&default_config_path(), &config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn install_service() -> Result<(), String> {
     run_service_command("install")
 }
@@ -139,7 +149,9 @@ fn main() {
             install_service,
             uninstall_service,
             start_service,
-            stop_service
+            stop_service,
+            get_config,
+            update_config
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LibreAscent Desktop");
