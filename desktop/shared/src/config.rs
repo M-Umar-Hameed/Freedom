@@ -90,8 +90,11 @@ pub fn default_config_path() -> PathBuf {
 
 pub fn load_or_create(path: &std::path::Path) -> serde_json::Result<DesktopConfig> {
     if path.exists() {
-        let text = std::fs::read_to_string(path).unwrap_or_default();
-        return serde_json::from_str(&text);
+        if let Ok(text) = std::fs::read_to_string(path) {
+            if let Ok(config) = serde_json::from_str(&text) {
+                return Ok(config);
+            }
+        }
     }
 
     let config = default_config();
