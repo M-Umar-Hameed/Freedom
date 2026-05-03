@@ -87,7 +87,7 @@ pub async fn run_local_dns_proxy_with_ready(
             }
         }
 
-        match forward_to_upstreams(&upstream_socket, &request, &upstreams, &mut buffer).await {
+        match forward_to_upstreams(&request, &upstreams, &mut buffer).await {
             Ok(upstream_size) => {
                 crate::dns_manager::log_tamper_event(&format!("Resolved: {request_id:04x}"));
                 let _ = socket.send_to(&buffer[..upstream_size], peer).await;
@@ -111,7 +111,6 @@ fn get_request_id(request: &[u8]) -> u16 {
 }
 
 async fn forward_to_upstreams(
-    upstream_socket: &UdpSocket,
     request: &[u8],
     upstreams: &[SocketAddr],
     buffer: &mut [u8],
