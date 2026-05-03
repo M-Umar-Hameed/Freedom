@@ -115,12 +115,13 @@ fn run_service_loop() -> anyhow::Result<()> {
         let blocker_task = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             let broadcast_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.ok();
+            let mut sys = crate::process_manager::create_system_handle();
 
             loop {
                 interval.tick().await;
                 let config_path = libreascent_shared::config::default_config_path();
                 if let Ok(config) = libreascent_shared::config::load_or_create(&config_path) {
-                    let blocked = crate::process_manager::check_and_block_apps(&config);
+                    let blocked = crate::process_manager::check_and_block_apps(&mut sys, &config);
 
                     if blocked {
                         if let Some(ref socket) = broadcast_socket {

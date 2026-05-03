@@ -1,12 +1,12 @@
-use sysinfo::System;
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 use libreascent_shared::config::DesktopConfig;
 
-pub fn check_and_block_apps(config: &DesktopConfig) -> bool {
+pub fn check_and_block_apps(sys: &mut System, config: &DesktopConfig) -> bool {
     if config.blocked_apps.is_empty() {
         return false;
     }
 
-    let sys = System::new_all();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
     let mut blocked_any = false;
 
     for (pid, process) in sys.processes() {
@@ -34,4 +34,8 @@ pub fn check_and_block_apps(config: &DesktopConfig) -> bool {
     }
 
     blocked_any
+}
+
+pub fn create_system_handle() -> System {
+    System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))
 }

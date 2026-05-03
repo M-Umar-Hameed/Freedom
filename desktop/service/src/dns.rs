@@ -49,11 +49,10 @@ pub async fn run_local_dns_proxy_with_ready(
             return Err(error);
         }
     };
-    let upstream_socket = UdpSocket::bind("0.0.0.0:0")
-        .await
-        .context("failed to bind upstream DNS socket")?;
     let broadcast_socket = UdpSocket::bind("127.0.0.1:0").await.ok();
     let mut buffer = vec![0_u8; 4096];
+    let blocklist = std::sync::Arc::new(config_loader::load_blocklist(&config_path));
+    crate::dns_manager::log_tamper_event("DNS proxy started. Blocklist loaded.");
 
     loop {
         let (size, peer) = match socket.recv_from(&mut buffer).await {
@@ -66,8 +65,10 @@ pub async fn run_local_dns_proxy_with_ready(
         };
         let request = buffer[..size].to_vec();
         let request_id = get_request_id(&request);
-        let blocklist = config_loader::load_blocklist(&config_path);
+        let blocklist = std::sync::Arc::clone(&blocklist);
+
         match build_block_response_if_needed(&request, &blocklist) {
+
             Ok(Some(response)) => {
                 crate::dns_manager::log_tamper_event(&format!("Blocked: {request_id:04x}"));
                 let _ = socket.send_to(&response, peer).await;

@@ -59,7 +59,8 @@ async fn main() -> Result<()> {
         }
         Some("block-apps") => {
             let config = libreascent_shared::config::load_or_create(&default_config_path())?;
-            process_manager::check_and_block_apps(&config);
+            let mut sys = process_manager::create_system_handle();
+            process_manager::check_and_block_apps(&mut sys, &config);
         }
         Some("service-run") => {
             service_manager::run_service()?;
