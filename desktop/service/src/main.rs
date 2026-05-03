@@ -44,10 +44,13 @@ async fn main() -> Result<()> {
             println!("Service stopped.");
         }
         Some("set-dns") => {
+            crate::dns_manager::log_tamper_event("Manual set-dns requested.");
             if !dns::local_dns_proxy_responds().await? {
+                crate::dns_manager::log_tamper_event("set-dns failed: DNS proxy not responding.");
                 bail!("local DNS proxy is not responding on 127.0.0.1:53; DNS was not changed");
             }
             dns_manager::set_system_dns("127.0.0.1")?;
+            crate::dns_manager::log_tamper_event("Manual set-dns succeeded.");
             println!("System DNS set to 127.0.0.1.");
         }
         Some("reset-dns") => {

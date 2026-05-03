@@ -7,7 +7,7 @@ use chrono::Local;
 pub fn set_system_dns(addr: &str) -> Result<()> {
     let interfaces = get_managed_interfaces()?;
     for interface in interfaces {
-        println!("Setting DNS for interface {} to {}", interface, addr);
+        log_tamper_event(&format!("Setting DNS for interface {} to {}", interface, addr));
         let status = Command::new("netsh")
             .args(&["interface", "ipv4", "set", "dnsservers", &format!("name=\"{}\"", interface), "static", addr, "primary"])
             .status()

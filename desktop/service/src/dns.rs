@@ -10,9 +10,9 @@ use tokio::time::{timeout, Duration};
 
 use crate::config_loader;
 
-const UPSTREAM_DNS: &str = "1.1.1.1:53";
+const UPSTREAM_DNS: &[&str] = &["1.1.1.1:53", "8.8.8.8:53", "1.0.0.1:53"];
 const UPSTREAM_TIMEOUT: Duration = Duration::from_secs(2);
-const LOCAL_PROXY_TIMEOUT: Duration = Duration::from_secs(2);
+const LOCAL_PROXY_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub async fn run_local_dns_proxy(config_path: PathBuf, bind_addr: &str) -> Result<()> {
     run_local_dns_proxy_with_ready(config_path, bind_addr, None).await
@@ -24,9 +24,14 @@ pub async fn run_local_dns_proxy_with_ready(
     ready: Option<oneshot::Sender<Result<(), String>>>,
 ) -> Result<()> {
     let bind: SocketAddr = bind_addr.parse().context("invalid DNS bind address")?;
-    let upstream: SocketAddr = UPSTREAM_DNS
-        .parse()
-        .context("invalid upstream DNS address")?;
+
+    let mut upstreams = Vec::new();
+    for addr in UPSTREAM_DNS {
+        if let Ok(sa) = addr.parse::<SocketAddr>() {
+            upstreams.push(sa);
+        }
+    }
+
     let socket = match UdpSocket::bind(bind)
         .await
         .context("failed to bind DNS proxy")
@@ -80,7 +85,7 @@ pub async fn run_local_dns_proxy_with_ready(
             }
         }
 
-        match forward_to_upstream(&upstream_socket, &request, upstream, &mut buffer).await {
+        match forward_to_upstreams(&upstream_socket, &request, &upstreams, &mut buffer).await {
             Ok(upstream_size) => {
                 let _ = socket.send_to(&buffer[..upstream_size], peer).await;
             }
@@ -88,34 +93,45 @@ pub async fn run_local_dns_proxy_with_ready(
                 if let Ok(response) = build_error_response(&request, ResponseCode::ServFail) {
                     let _ = socket.send_to(&response, peer).await;
                 }
-                crate::dns_manager::log_tamper_event(&format!("DNS upstream failure: {error}"));
+                crate::dns_manager::log_tamper_event(&format!("DNS all upstreams failed: {error}"));
             }
         }
     }
 }
 
-async fn forward_to_upstream(
+async fn forward_to_upstreams(
     upstream_socket: &UdpSocket,
     request: &[u8],
-    upstream: SocketAddr,
+    upstreams: &[SocketAddr],
     buffer: &mut [u8],
 ) -> Result<usize> {
-    upstream_socket
-        .send_to(request, upstream)
-        .await
-        .context("failed to forward DNS request")?;
+    let mut last_error = None;
 
-    loop {
-        match timeout(UPSTREAM_TIMEOUT, upstream_socket.recv_from(buffer)).await {
-            Ok(Ok((upstream_size, _))) => return Ok(upstream_size),
-            Ok(Err(e)) if e.kind() == std::io::ErrorKind::ConnectionReset => {
-                // Ignore ConnectionReset and wait for the actual response
-                continue;
+    for upstream in upstreams {
+        if let Err(e) = upstream_socket.send_to(request, *upstream).await {
+            last_error = Some(anyhow::anyhow!("failed to send to {upstream}: {e}"));
+            continue;
+        }
+
+        loop {
+            match timeout(UPSTREAM_TIMEOUT, upstream_socket.recv_from(buffer)).await {
+                Ok(Ok((upstream_size, _))) => return Ok(upstream_size),
+                Ok(Err(e)) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                    continue;
+                }
+                Ok(Err(e)) => {
+                    last_error = Some(anyhow::anyhow!("failed to receive from {upstream}: {e}"));
+                    break;
+                }
+                Err(_) => {
+                    last_error = Some(anyhow::anyhow!("timed out waiting for {upstream}"));
+                    break;
+                }
             }
-            Ok(Err(e)) => return Err(e).context("failed to receive upstream DNS response"),
-            Err(_) => return Err(anyhow::anyhow!("timed out waiting for upstream DNS response")),
         }
     }
+
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("no upstreams available")))
 }
 
 pub async fn local_dns_proxy_responds() -> Result<bool> {
@@ -158,7 +174,7 @@ fn dns_probe_query() -> Result<Vec<u8>> {
     message.set_message_type(MessageType::Query);
     message.set_recursion_desired(true);
     message.add_query(Query::query(
-        Name::from_ascii("cloudflare.com.").context("failed to build DNS health-check name")?,
+        Name::from_ascii("pornhub.com.").context("failed to build DNS health-check name")?,
         RecordType::A,
     ));
     message
