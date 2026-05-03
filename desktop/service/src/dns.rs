@@ -130,12 +130,22 @@ pub async fn local_dns_proxy_responds() -> Result<bool> {
         .context("failed to send local DNS health-check query")?;
 
     let mut buffer = vec![0_u8; 512];
-    match timeout(LOCAL_PROXY_TIMEOUT, socket.recv_from(&mut buffer)).await {
-        Ok(Ok((size, _))) => Message::from_bytes(&buffer[..size])
-            .map(|response| response.id() == 0x4c41)
-            .context("failed to parse local DNS health-check response"),
-        Ok(Err(error)) => Err(error).context("failed to receive local DNS health-check response"),
-        Err(_) => Ok(false),
+    loop {
+        match timeout(LOCAL_PROXY_TIMEOUT, socket.recv_from(&mut buffer)).await {
+            Ok(Ok((size, _))) => {
+                return Message::from_bytes(&buffer[..size])
+                    .map(|response| response.id() == 0x4c41)
+                    .context("failed to parse local DNS health-check response")
+            }
+            Ok(Err(e)) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                // Ignore ConnectionReset on Windows (likely ICMP port unreachable from a previous probe)
+                continue;
+            }
+            Ok(Err(error)) => {
+                return Err(error).context("failed to receive local DNS health-check response")
+            }
+            Err(_) => return Ok(false),
+        }
     }
 }
 
