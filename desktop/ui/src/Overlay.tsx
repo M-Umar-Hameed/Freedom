@@ -1,6 +1,12 @@
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import logo from "./assets/logo.png";
 
 export function Overlay() {
+  const closeOverlay = async () => {
+    const window = getCurrentWebviewWindow();
+    await window.hide();
+  };
+
   return (
     <div className="overlay-root">
       <div className="overlay-content">
@@ -10,7 +16,7 @@ export function Overlay() {
         <p className="message">
           This application or website has been blocked to help you stay focused.
         </p>
-        <button className="btn-close" onClick={() => window.close()}>
+        <button className="btn-close" onClick={closeOverlay}>
           Go back to work
         </button>
       </div>

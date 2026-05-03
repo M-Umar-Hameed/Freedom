@@ -4,8 +4,8 @@ use tokio::sync::oneshot;
 use windows_service::{
     define_windows_service,
     service::{
-        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
-        ServiceType, ServiceInfo, ServiceStartType, ServiceErrorControl, ServiceAccess,
+        ServiceAccess, ServiceControl, ServiceControlAccept, ServiceErrorControl, ServiceExitCode,
+        ServiceInfo, ServiceStartType, ServiceState, ServiceStatus, ServiceType,
     },
     service_control_handler::{self, ServiceControlHandlerResult},
     service_manager::{ServiceManager, ServiceManagerAccess},
@@ -16,24 +16,31 @@ pub const SERVICE_DISPLAY_NAME: &str = "LibreAscent Background Service";
 
 define_windows_service!(ffi_service_main, libre_ascent_service_main);
 
+enum ServiceEvent {
+    StopRequested,
+    DnsProxyStopped,
+}
+
 pub fn run_service() -> anyhow::Result<()> {
     windows_service::service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
     Ok(())
 }
 
 fn libre_ascent_service_main(_arguments: Vec<OsString>) {
-    if let Err(_e) = run_service_loop() {
-        // Log error?
+    if let Err(e) = run_service_loop() {
+        crate::dns_manager::log_tamper_event(&format!("Service loop failed: {e}"));
     }
 }
 
 fn run_service_loop() -> anyhow::Result<()> {
+    crate::dns_manager::log_tamper_event("Service starting...");
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    let control_tx = tx.clone();
 
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
             ServiceControl::Stop => {
-                let _ = tx.blocking_send(());
+                let _ = control_tx.blocking_send(ServiceEvent::StopRequested);
                 ServiceControlHandlerResult::NoError
             }
             ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
@@ -57,45 +64,57 @@ fn run_service_loop() -> anyhow::Result<()> {
     rt.block_on(async {
         let config_path = libreascent_shared::config::default_config_path();
         let (ready_tx, ready_rx) = oneshot::channel();
+        let dns_exit_tx = tx.clone();
 
-        tokio::spawn(async move {
-            if let Err(e) = crate::dns::run_local_dns_proxy_with_ready(
+        let dns_task = tokio::spawn(async move {
+            let result = crate::dns::run_local_dns_proxy_with_ready(
                 config_path.clone(),
                 "127.0.0.1:53",
                 Some(ready_tx),
-            ).await {
-                crate::dns_manager::log_tamper_event(&format!("DNS proxy stopped: {e}"));
+            )
+            .await;
+
+            if let Err(e) = result {
+                crate::dns_manager::log_tamper_event(&format!("DNS proxy stopped with error: {e}"));
+            } else {
+                crate::dns_manager::log_tamper_event("DNS proxy stopped gracefully.");
             }
+            let _ = dns_exit_tx.send(ServiceEvent::DnsProxyStopped).await;
         });
 
+        let mut enforce_task = None;
         let dns_proxy_ready = matches!(ready_rx.await, Ok(Ok(())));
         if dns_proxy_ready {
             let _ = crate::dns_manager::enforce_system_dns("127.0.0.1");
 
-            tokio::spawn(async move {
+            enforce_task = Some(tokio::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(2));
                 loop {
                     interval.tick().await;
                     if let Err(e) = crate::dns_manager::enforce_system_dns("127.0.0.1") {
-                        crate::dns_manager::log_tamper_event(&format!("DNS enforcement failed: {e}"));
+                        crate::dns_manager::log_tamper_event(&format!(
+                            "DNS enforcement failed: {e}"
+                        ));
                     }
                 }
-            });
+            }));
         } else {
-            crate::dns_manager::log_tamper_event("DNS proxy did not start. DNS settings were not changed.");
+            crate::dns_manager::log_tamper_event(
+                "DNS proxy did not start. DNS settings were not changed.",
+            );
         }
 
         // Start App blocker
-        tokio::spawn(async move {
+        let blocker_task = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             let broadcast_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.ok();
-            
+
             loop {
                 interval.tick().await;
                 let config_path = libreascent_shared::config::default_config_path();
                 if let Ok(config) = libreascent_shared::config::load_or_create(&config_path) {
                     let blocked = crate::process_manager::check_and_block_apps(&config);
-                    
+
                     if blocked {
                         if let Some(ref socket) = broadcast_socket {
                             let _ = socket.send_to(b"block:app", "127.0.0.1:13370").await;
@@ -105,18 +124,34 @@ fn run_service_loop() -> anyhow::Result<()> {
             }
         });
 
-        // Wait for stop signal
-        rx.recv().await;
+        // Wait for stop signal or DNS proxy failure. The service must not keep
+        // enforcing 127.0.0.1 when the local DNS proxy is gone.
+        let event = rx.recv().await;
+
+        // Stop all background tasks before resetting DNS
+        if let Some(handle) = enforce_task {
+            handle.abort();
+        }
+        blocker_task.abort();
+        dns_task.abort();
 
         // Reset system DNS on stop, unless Hardcore
         let config_path = libreascent_shared::config::default_config_path();
         let config = libreascent_shared::config::load_or_create(&config_path).ok();
-        let is_hardcore = config.map(|c| c.control_mode == libreascent_shared::config::ControlMode::Hardcore).unwrap_or(false);
+        let is_hardcore = config
+            .map(|c| c.control_mode == libreascent_shared::config::ControlMode::Hardcore)
+            .unwrap_or(false);
 
         if !is_hardcore {
             let _ = crate::dns_manager::reset_system_dns();
+        } else if matches!(event, Some(ServiceEvent::DnsProxyStopped)) {
+            crate::dns_manager::log_tamper_event(
+                "DNS proxy stopped in Hardcore mode. DNS NOT reset.",
+            );
         } else {
-            crate::dns_manager::log_tamper_event("Service stopped in Hardcore mode. DNS NOT reset.");
+            crate::dns_manager::log_tamper_event(
+                "Service stopped in Hardcore mode. DNS NOT reset.",
+            );
         }
     });
 
@@ -134,7 +169,10 @@ fn run_service_loop() -> anyhow::Result<()> {
 }
 
 pub fn install_service() -> anyhow::Result<()> {
-    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE)?;
+    let manager = ServiceManager::local_computer(
+        None::<&str>,
+        ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE,
+    )?;
     let exe_path = std::env::current_exe()?;
 
     let info = ServiceInfo {
@@ -156,9 +194,14 @@ pub fn install_service() -> anyhow::Result<()> {
 }
 
 pub fn uninstall_service() -> anyhow::Result<()> {
+    let _ = crate::dns_manager::reset_system_dns();
+
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE)?;
-    
+    let service = manager.open_service(
+        SERVICE_NAME,
+        ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE,
+    )?;
+
     let status = service.query_status()?;
     if status.current_state != ServiceState::Stopped {
         println!("Stopping service before uninstall...");
@@ -168,6 +211,7 @@ pub fn uninstall_service() -> anyhow::Result<()> {
     }
 
     service.delete()?;
+    let _ = crate::dns_manager::reset_system_dns();
     Ok(())
 }
 
@@ -180,7 +224,10 @@ pub fn start_service() -> anyhow::Result<()> {
 
 pub fn stop_service() -> anyhow::Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    let service = manager.open_service(SERVICE_NAME, ServiceAccess::STOP | ServiceAccess::QUERY_STATUS)?;
+    let service = manager.open_service(
+        SERVICE_NAME,
+        ServiceAccess::STOP | ServiceAccess::QUERY_STATUS,
+    )?;
     service.stop()?;
     Ok(())
 }

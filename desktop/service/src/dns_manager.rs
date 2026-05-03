@@ -39,6 +39,7 @@ pub fn log_tamper_event(message: &str) {
 }
 
 pub fn reset_system_dns() -> Result<()> {
+    log_tamper_event("Resetting system DNS to DHCP/Automatic.");
     // Try netsh first
     if let Ok(interfaces) = get_connected_interfaces() {
         for interface in interfaces {

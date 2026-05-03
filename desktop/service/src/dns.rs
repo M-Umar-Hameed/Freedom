@@ -6,10 +6,13 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::net::UdpSocket;
 use tokio::sync::oneshot;
+use tokio::time::{timeout, Duration};
 
 use crate::config_loader;
 
-const UPSTREAM_DNS: &str = "1.1.1.3:53";
+const UPSTREAM_DNS: &str = "1.1.1.1:53";
+const UPSTREAM_TIMEOUT: Duration = Duration::from_secs(2);
+const LOCAL_PROXY_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub async fn run_local_dns_proxy(config_path: PathBuf, bind_addr: &str) -> Result<()> {
     run_local_dns_proxy_with_ready(config_path, bind_addr, None).await
@@ -21,8 +24,13 @@ pub async fn run_local_dns_proxy_with_ready(
     ready: Option<oneshot::Sender<Result<(), String>>>,
 ) -> Result<()> {
     let bind: SocketAddr = bind_addr.parse().context("invalid DNS bind address")?;
-    let upstream: SocketAddr = UPSTREAM_DNS.parse().context("invalid upstream DNS address")?;
-    let socket = match UdpSocket::bind(bind).await.context("failed to bind DNS proxy") {
+    let upstream: SocketAddr = UPSTREAM_DNS
+        .parse()
+        .context("invalid upstream DNS address")?;
+    let socket = match UdpSocket::bind(bind)
+        .await
+        .context("failed to bind DNS proxy")
+    {
         Ok(socket) => {
             if let Some(sender) = ready {
                 let _ = sender.send(Ok(()));
@@ -36,40 +44,122 @@ pub async fn run_local_dns_proxy_with_ready(
             return Err(error);
         }
     };
-    let upstream_socket = UdpSocket::bind("0.0.0.0:0").await.context("failed to bind upstream DNS socket")?;
+    let upstream_socket = UdpSocket::bind("0.0.0.0:0")
+        .await
+        .context("failed to bind upstream DNS socket")?;
     let broadcast_socket = UdpSocket::bind("127.0.0.1:0").await.ok();
     let mut buffer = vec![0_u8; 4096];
 
     loop {
-        let (size, peer) = socket.recv_from(&mut buffer).await.context("failed to receive DNS packet")?;
-        let request = &buffer[..size];
+        let (size, peer) = match socket.recv_from(&mut buffer).await {
+            Ok(res) => res,
+            Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                // Ignore ConnectionReset on Windows (caused by ICMP Port Unreachable from previous send_to)
+                continue;
+            }
+            Err(e) => return Err(e).context("failed to receive DNS packet"),
+        };
+        let request = buffer[..size].to_vec();
         let blocklist = config_loader::load_blocklist(&config_path);
 
-        if let Some(response) = build_block_response_if_needed(request, &blocklist)? {
-            socket.send_to(&response, peer).await.context("failed to send blocked DNS response")?;
-            
-            if let Some(ref b_socket) = broadcast_socket {
-                let _ = b_socket.send_to(b"block:dns", "127.0.0.1:13370").await;
+        match build_block_response_if_needed(&request, &blocklist) {
+            Ok(Some(response)) => {
+                let _ = socket.send_to(&response, peer).await;
+
+                if let Some(ref b_socket) = broadcast_socket {
+                    let _ = b_socket.send_to(b"block:dns", "127.0.0.1:13370").await;
+                }
+                continue;
             }
-            continue;
+            Ok(None) => {}
+            Err(error) => {
+                crate::dns_manager::log_tamper_event(&format!(
+                    "Invalid DNS request ignored: {error}"
+                ));
+                continue;
+            }
         }
 
-        upstream_socket
-            .send_to(request, upstream)
-            .await
-            .context("failed to forward DNS request")?;
-        let (upstream_size, _) = upstream_socket
-            .recv_from(&mut buffer)
-            .await
-            .context("failed to receive upstream DNS response")?;
-        socket
-            .send_to(&buffer[..upstream_size], peer)
-            .await
-            .context("failed to send upstream DNS response")?;
+        match forward_to_upstream(&upstream_socket, &request, upstream, &mut buffer).await {
+            Ok(upstream_size) => {
+                let _ = socket.send_to(&buffer[..upstream_size], peer).await;
+            }
+            Err(error) => {
+                if let Ok(response) = build_error_response(&request, ResponseCode::ServFail) {
+                    let _ = socket.send_to(&response, peer).await;
+                }
+                crate::dns_manager::log_tamper_event(&format!("DNS upstream failure: {error}"));
+            }
+        }
     }
 }
 
-pub fn build_block_response_if_needed(request: &[u8], blocklist: &DomainBlocklist) -> Result<Option<Vec<u8>>> {
+async fn forward_to_upstream(
+    upstream_socket: &UdpSocket,
+    request: &[u8],
+    upstream: SocketAddr,
+    buffer: &mut [u8],
+) -> Result<usize> {
+    upstream_socket
+        .send_to(request, upstream)
+        .await
+        .context("failed to forward DNS request")?;
+
+    loop {
+        match timeout(UPSTREAM_TIMEOUT, upstream_socket.recv_from(buffer)).await {
+            Ok(Ok((upstream_size, _))) => return Ok(upstream_size),
+            Ok(Err(e)) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                // Ignore ConnectionReset and wait for the actual response
+                continue;
+            }
+            Ok(Err(e)) => return Err(e).context("failed to receive upstream DNS response"),
+            Err(_) => return Err(anyhow::anyhow!("timed out waiting for upstream DNS response")),
+        }
+    }
+}
+
+pub async fn local_dns_proxy_responds() -> Result<bool> {
+    let socket = UdpSocket::bind("127.0.0.1:0")
+        .await
+        .context("failed to bind local DNS health-check socket")?;
+    let request = dns_probe_query()?;
+
+    socket
+        .send_to(&request, "127.0.0.1:53")
+        .await
+        .context("failed to send local DNS health-check query")?;
+
+    let mut buffer = vec![0_u8; 512];
+    match timeout(LOCAL_PROXY_TIMEOUT, socket.recv_from(&mut buffer)).await {
+        Ok(Ok((size, _))) => Message::from_bytes(&buffer[..size])
+            .map(|response| response.id() == 0x4c41)
+            .context("failed to parse local DNS health-check response"),
+        Ok(Err(error)) => Err(error).context("failed to receive local DNS health-check response"),
+        Err(_) => Ok(false),
+    }
+}
+
+fn dns_probe_query() -> Result<Vec<u8>> {
+    use hickory_proto::op::Query;
+    use hickory_proto::rr::{Name, RecordType};
+
+    let mut message = Message::new();
+    message.set_id(0x4c41);
+    message.set_message_type(MessageType::Query);
+    message.set_recursion_desired(true);
+    message.add_query(Query::query(
+        Name::from_ascii("cloudflare.com.").context("failed to build DNS health-check name")?,
+        RecordType::A,
+    ));
+    message
+        .to_bytes()
+        .context("failed to encode DNS health-check query")
+}
+
+pub fn build_block_response_if_needed(
+    request: &[u8],
+    blocklist: &DomainBlocklist,
+) -> Result<Option<Vec<u8>>> {
     let message = Message::from_bytes(request).context("failed to parse DNS request")?;
     let Some(query) = message.queries().first() else {
         return Ok(None);
@@ -80,6 +170,11 @@ pub fn build_block_response_if_needed(request: &[u8], blocklist: &DomainBlocklis
         return Ok(None);
     }
 
+    build_error_response(request, ResponseCode::NXDomain).map(Some)
+}
+
+pub fn build_error_response(request: &[u8], response_code: ResponseCode) -> Result<Vec<u8>> {
+    let message = Message::from_bytes(request).context("failed to parse DNS request")?;
     let mut response = Message::new();
     response.set_id(message.id());
     response.set_message_type(MessageType::Response);
@@ -87,10 +182,15 @@ pub fn build_block_response_if_needed(request: &[u8], blocklist: &DomainBlocklis
     response.set_authoritative(false);
     response.set_recursion_desired(message.recursion_desired());
     response.set_recursion_available(true);
-    response.set_response_code(ResponseCode::NXDomain);
-    response.add_query(query.clone());
+    response.set_response_code(response_code);
 
-    response.to_bytes().context("failed to encode blocked DNS response").map(Some)
+    if let Some(query) = message.queries().first() {
+        response.add_query(query.clone());
+    }
+
+    response
+        .to_bytes()
+        .context("failed to encode DNS error response")
 }
 
 #[cfg(test)]
@@ -118,9 +218,32 @@ mod tests {
         let request = dns_query("allowed.com.");
         let blocklist = DomainBlocklist::new(vec!["example.com".to_string()], Vec::<String>::new());
 
-        let response = build_block_response_if_needed(&request, &blocklist).expect("request should parse");
+        let response =
+            build_block_response_if_needed(&request, &blocklist).expect("request should parse");
 
         assert!(response.is_none());
+    }
+
+    #[test]
+    fn returns_servfail_for_upstream_failure() {
+        let request = dns_query("allowed.com.");
+
+        let response_bytes =
+            build_error_response(&request, ResponseCode::ServFail).expect("request should parse");
+        let response = Message::from_bytes(&response_bytes).expect("response should parse");
+
+        assert_eq!(response.response_code(), ResponseCode::ServFail);
+        assert_eq!(response.queries().len(), 1);
+    }
+
+    #[test]
+    fn builds_valid_dns_probe_query() {
+        let request = dns_probe_query().expect("query should encode");
+        let message = Message::from_bytes(&request).expect("query should parse");
+
+        assert_eq!(message.id(), 0x4c41);
+        assert_eq!(message.queries().len(), 1);
+        assert_eq!(message.queries()[0].name().to_ascii(), "cloudflare.com.");
     }
 
     fn dns_query(domain: &str) -> Vec<u8> {

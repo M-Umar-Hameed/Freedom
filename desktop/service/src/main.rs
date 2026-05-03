@@ -44,6 +44,9 @@ async fn main() -> Result<()> {
             println!("Service stopped.");
         }
         Some("set-dns") => {
+            if !dns::local_dns_proxy_responds().await? {
+                bail!("local DNS proxy is not responding on 127.0.0.1:53; DNS was not changed");
+            }
             dns_manager::set_system_dns("127.0.0.1")?;
             println!("System DNS set to 127.0.0.1.");
         }
