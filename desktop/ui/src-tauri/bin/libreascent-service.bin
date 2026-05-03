@@ -1,0 +1,2 @@
+Placeholder for Tauri resource checks in debug builds.
+The release build overwrites this file with the compiled service binary.

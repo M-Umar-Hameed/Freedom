@@ -6,11 +6,26 @@ import logo from "./assets/logo.png";
 type BlockedAppRule = {
   name: string;
   executable: string;
+  fullPath?: string | null;
+};
+
+type BlocklistSource = {
+  id: string;
+  name: string;
+  url: string;
+  format: string;
+  enabled: boolean;
 };
 
 type DesktopConfig = {
+  schemaVersion: number;
+  adultBlockingEnabled: boolean;
+  sources: BlocklistSource[];
+  includedDomains: string[];
+  excludedDomains: string[];
+  keywords: string[];
   blockedApps: BlockedAppRule[];
-  controlMode: "Flexible" | "Locked" | "Hardcore";
+  controlMode: "flexible" | "locked" | "hardcore";
   friction: {
     countdownSeconds: number;
     clickCount: number;
@@ -32,6 +47,7 @@ export function App() {
   const [status, setStatus] = useState<DesktopStatus | null>(null);
   const [config, setConfig] = useState<DesktopConfig | null>(null);
   const [domain, setDomain] = useState("example.com");
+  const [newDomain, setNewDomain] = useState("");
   const [newApp, setNewApp] = useState("");
   const [domainResult, setDomainResult] = useState<DomainResult>("idle");
   const [loading, setLoading] = useState(false);
@@ -70,7 +86,7 @@ export function App() {
   }
 
   async function runAction(cmd: string, title?: string) {
-    if (config?.controlMode !== "Flexible" && title) {
+    if (config?.controlMode !== "flexible" && title) {
       setFrictionTarget({ cmd, title });
       return;
     }
@@ -90,7 +106,7 @@ export function App() {
     if (!config || !newApp) return;
     const updated = {
       ...config,
-      blockedApps: [...config.blockedApps, { name: newApp, executable: newApp }],
+      blockedApps: [...config.blockedApps, { name: newApp, executable: newApp, fullPath: null }],
     };
     try {
       await invoke("update_config", { config: updated });
@@ -103,13 +119,51 @@ export function App() {
 
   async function removeApp(exe: string) {
     if (!config) return;
-    if (config.controlMode !== "Flexible") {
+    if (config.controlMode !== "flexible") {
       alert("Control Mode prevents removing rules directly.");
       return;
     }
     const updated = {
       ...config,
       blockedApps: config.blockedApps.filter((a) => a.executable !== exe),
+    };
+    try {
+      await invoke("update_config", { config: updated });
+      setConfig(updated);
+    } catch (e) {
+      alert(e);
+    }
+  }
+
+  async function addDomain() {
+    const value = newDomain.trim();
+    if (!config || !value) return;
+    const updated = {
+      ...config,
+      includedDomains: [...config.includedDomains, value],
+    };
+    try {
+      await invoke("update_config", { config: updated });
+      setConfig(updated);
+      setNewDomain("");
+      if (domainResult !== "idle") {
+        setDomain(value);
+        setDomainResult("idle");
+      }
+    } catch (e) {
+      alert(e);
+    }
+  }
+
+  async function removeDomain(value: string) {
+    if (!config) return;
+    if (config.controlMode !== "flexible") {
+      alert("Control Mode prevents removing rules directly.");
+      return;
+    }
+    const updated = {
+      ...config,
+      includedDomains: config.includedDomains.filter((domain) => domain !== value),
     };
     try {
       await invoke("update_config", { config: updated });
@@ -168,6 +222,12 @@ export function App() {
           </div>
         </dl>
 
+        {status && !status.dnsControlled ? (
+          <p className="warning">
+            Browser blocking is not active until System DNS is managed by LibreAscent.
+          </p>
+        ) : null}
+
         <div className="actions-row">
           {!status?.serviceInstalled ? (
             <button disabled={loading} onClick={() => runAction("install_service")}>
@@ -194,10 +254,33 @@ export function App() {
               >
                 Uninstall
               </button>
+              <button
+                disabled={loading}
+                className="btn-secondary"
+                onClick={() => runAction("repair_service", "Repair Protection Service")}
+              >
+                Repair Service
+              </button>
             </>
           )}
           <button disabled={loading} onClick={() => invoke("show_overlay")}>
             Preview Overlay
+          </button>
+        </div>
+
+        <div className="actions-row">
+          <button
+            disabled={loading || !status?.serviceRunning}
+            onClick={() => runAction("enable_dns_protection")}
+          >
+            Enable DNS Protection
+          </button>
+          <button
+            disabled={loading}
+            className="btn-secondary"
+            onClick={() => runAction("reset_dns", "Reset DNS Protection")}
+          >
+            Reset DNS
           </button>
         </div>
 
@@ -206,6 +289,28 @@ export function App() {
           <br />
           Mode: {config?.controlMode ?? "Unknown"}
         </p>
+      </section>
+
+      <section className="panel">
+        <h2>Blocked domains</h2>
+        <div className="domain-row">
+          <input
+            placeholder="e.g. example.com"
+            value={newDomain}
+            onChange={(e) => setNewDomain(e.target.value)}
+          />
+          <button onClick={addDomain}>Add</button>
+        </div>
+        <ul className="app-list">
+          {config?.includedDomains.map((blockedDomain) => (
+            <li key={blockedDomain}>
+              <span>{blockedDomain}</span>
+              <button className="btn-link" onClick={() => removeDomain(blockedDomain)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="panel">

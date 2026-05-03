@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::time::Duration;
+use tokio::sync::oneshot;
 use windows_service::{
     define_windows_service,
     service::{
@@ -54,39 +55,35 @@ fn run_service_loop() -> anyhow::Result<()> {
 
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
-        // DNS management DISABLED by default during development to avoid internet breakage
-        /*
-        if let Err(_e) = crate::dns_manager::set_system_dns("127.0.0.1") {
-            // Log error
-        }
-        */
-
-        // Start DNS proxy in background
         let config_path = libreascent_shared::config::default_config_path();
-        
+        let (ready_tx, ready_rx) = oneshot::channel();
+
         tokio::spawn(async move {
-            if let Err(_e) = crate::dns::run_local_dns_proxy(config_path.clone(), "127.0.0.1:53").await {
-                // Log error
+            if let Err(e) = crate::dns::run_local_dns_proxy_with_ready(
+                config_path.clone(),
+                "127.0.0.1:53",
+                Some(ready_tx),
+            ).await {
+                crate::dns_manager::log_tamper_event(&format!("DNS proxy stopped: {e}"));
             }
         });
 
-        // DNS monitor DISABLED by default
-        /*
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(30));
-            loop {
-                interval.tick().await;
-                match crate::dns_manager::is_dns_set_correctly("127.0.0.1") {
-                    Ok(false) => {
-                        crate::dns_manager::log_tamper_event("DNS settings tampered. Restoring...");
-                        let _ = crate::dns_manager::set_system_dns("127.0.0.1");
+        let dns_proxy_ready = matches!(ready_rx.await, Ok(Ok(())));
+        if dns_proxy_ready {
+            let _ = crate::dns_manager::enforce_system_dns("127.0.0.1");
+
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(2));
+                loop {
+                    interval.tick().await;
+                    if let Err(e) = crate::dns_manager::enforce_system_dns("127.0.0.1") {
+                        crate::dns_manager::log_tamper_event(&format!("DNS enforcement failed: {e}"));
                     }
-                    Err(_e) => {}
-                    _ => {}
                 }
-            }
-        });
-        */
+            });
+        } else {
+            crate::dns_manager::log_tamper_event("DNS proxy did not start. DNS settings were not changed.");
+        }
 
         // Start App blocker
         tokio::spawn(async move {

@@ -67,6 +67,15 @@ dd {
   word-break: break-all;
 }
 
+.warning {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #7a5a21;
+  border-radius: 6px;
+  color: #ffd166;
+  background: #20180d;
+}
+
 .actions-row {
   display: flex;
   gap: 12px;
@@ -75,6 +84,10 @@ dd {
 
 .btn-danger {
   background: #6f1f1f !important;
+}
+
+.btn-secondary {
+  background: #223044 !important;
 }
 
 .btn-link {

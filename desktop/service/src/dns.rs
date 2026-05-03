@@ -5,15 +5,37 @@ use libreascent_shared::blocklist::DomainBlocklist;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::net::UdpSocket;
+use tokio::sync::oneshot;
 
 use crate::config_loader;
 
 const UPSTREAM_DNS: &str = "1.1.1.3:53";
 
 pub async fn run_local_dns_proxy(config_path: PathBuf, bind_addr: &str) -> Result<()> {
+    run_local_dns_proxy_with_ready(config_path, bind_addr, None).await
+}
+
+pub async fn run_local_dns_proxy_with_ready(
+    config_path: PathBuf,
+    bind_addr: &str,
+    ready: Option<oneshot::Sender<Result<(), String>>>,
+) -> Result<()> {
     let bind: SocketAddr = bind_addr.parse().context("invalid DNS bind address")?;
     let upstream: SocketAddr = UPSTREAM_DNS.parse().context("invalid upstream DNS address")?;
-    let socket = UdpSocket::bind(bind).await.context("failed to bind DNS proxy")?;
+    let socket = match UdpSocket::bind(bind).await.context("failed to bind DNS proxy") {
+        Ok(socket) => {
+            if let Some(sender) = ready {
+                let _ = sender.send(Ok(()));
+            }
+            socket
+        }
+        Err(error) => {
+            if let Some(sender) = ready {
+                let _ = sender.send(Err(error.to_string()));
+            }
+            return Err(error);
+        }
+    };
     let upstream_socket = UdpSocket::bind("0.0.0.0:0").await.context("failed to bind upstream DNS socket")?;
     let broadcast_socket = UdpSocket::bind("127.0.0.1:0").await.ok();
     let mut buffer = vec![0_u8; 4096];

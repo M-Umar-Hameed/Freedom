@@ -32,7 +32,23 @@ fn check_dns_control() -> bool {
     }
 }
 
-fn get_service_path() -> PathBuf {
+fn get_service_path(handle: &tauri::AppHandle) -> PathBuf {
+    if let Ok(resource_dir) = handle.path().resource_dir() {
+        let bundled = resource_dir.join("bin").join("libreascent-service.bin");
+        if bundled.exists() {
+            let service_path = default_config_path()
+                .parent()
+                .unwrap()
+                .join("libreascent-service.exe");
+            if let Some(parent) = service_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if std::fs::copy(&bundled, &service_path).is_ok() {
+                return service_path;
+            }
+        }
+    }
+
     let mut path = std::env::current_exe().unwrap();
     path.pop(); // remove current exe name
     
@@ -44,8 +60,31 @@ fn get_service_path() -> PathBuf {
     service_exe
 }
 
-fn run_service_command(verb: &str) -> Result<(), String> {
-    let service_path = get_service_path();
+fn service_state() -> (bool, bool) {
+    let service_name = "LibreAscentService";
+    let mut installed = false;
+    let mut running = false;
+
+    if let Ok(manager) = ServiceManager::local_computer(
+        None::<&str>,
+        ServiceManagerAccess::CONNECT,
+    ) {
+        if let Ok(service) = manager.open_service(
+            service_name,
+            ServiceAccess::QUERY_STATUS,
+        ) {
+            installed = true;
+            if let Ok(status) = service.query_status() {
+                running = status.current_state == ServiceState::Running;
+            }
+        }
+    }
+
+    (installed, running)
+}
+
+fn run_service_command(handle: &tauri::AppHandle, verb: &str) -> Result<(), String> {
+    let service_path = get_service_path(handle);
     if !service_path.exists() {
         return Err(format!("Service binary not found at {}", service_path.display()));
     }
@@ -78,24 +117,7 @@ fn run_service_command(verb: &str) -> Result<(), String> {
 
 #[tauri::command]
 fn get_status() -> DesktopStatus {
-    let service_name = "LibreAscentService";
-    let mut installed = false;
-    let mut running = false;
-
-    if let Ok(manager) = ServiceManager::local_computer(
-        None::<&str>,
-        ServiceManagerAccess::CONNECT,
-    ) {
-        if let Ok(service) = manager.open_service(
-            service_name,
-            ServiceAccess::QUERY_STATUS,
-        ) {
-            installed = true;
-            if let Ok(status) = service.query_status() {
-                running = status.current_state == ServiceState::Running;
-            }
-        }
-    }
+    let (installed, running) = service_state();
 
     DesktopStatus {
         service_installed: installed,
@@ -118,23 +140,46 @@ fn update_config(config: DesktopConfig) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn install_service() -> Result<(), String> {
-    run_service_command("install")
+fn install_service(handle: tauri::AppHandle) -> Result<(), String> {
+    run_service_command(&handle, "install")
 }
 
 #[tauri::command]
-fn uninstall_service() -> Result<(), String> {
-    run_service_command("uninstall")
+fn uninstall_service(handle: tauri::AppHandle) -> Result<(), String> {
+    run_service_command(&handle, "uninstall")
 }
 
 #[tauri::command]
-fn start_service() -> Result<(), String> {
-    run_service_command("start")
+fn start_service(handle: tauri::AppHandle) -> Result<(), String> {
+    run_service_command(&handle, "start")
 }
 
 #[tauri::command]
-fn stop_service() -> Result<(), String> {
-    run_service_command("stop")
+fn stop_service(handle: tauri::AppHandle) -> Result<(), String> {
+    run_service_command(&handle, "stop")
+}
+
+#[tauri::command]
+fn enable_dns_protection(handle: tauri::AppHandle) -> Result<(), String> {
+    let (_, running) = service_state();
+    if !running {
+        return Err("Start the service before enabling DNS protection.".to_string());
+    }
+
+    run_service_command(&handle, "set-dns")
+}
+
+#[tauri::command]
+fn reset_dns(handle: tauri::AppHandle) -> Result<(), String> {
+    run_service_command(&handle, "reset-dns")
+}
+
+#[tauri::command]
+fn repair_service(handle: tauri::AppHandle) -> Result<(), String> {
+    let _ = run_service_command(&handle, "stop");
+    let _ = run_service_command(&handle, "uninstall");
+    run_service_command(&handle, "install")?;
+    run_service_command(&handle, "start")
 }
 
 #[tauri::command]
@@ -183,6 +228,9 @@ fn main() {
             uninstall_service,
             start_service,
             stop_service,
+            enable_dns_protection,
+            reset_dns,
+            repair_service,
             get_config,
             update_config,
             show_overlay
