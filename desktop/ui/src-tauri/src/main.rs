@@ -367,6 +367,13 @@ fn show_overlay(handle: tauri::AppHandle) {
     }
 }
 
+#[tauri::command]
+fn hide_overlay(handle: tauri::AppHandle) {
+    if let Some(window) = handle.get_webview_window("overlay") {
+        let _ = window.hide();
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -410,7 +417,8 @@ fn main() {
             repair_service,
             get_config,
             update_config,
-            show_overlay
+            show_overlay,
+            hide_overlay
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LibreAscent Desktop");

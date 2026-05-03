@@ -1,10 +1,9 @@
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { invoke } from "@tauri-apps/api/core";
 import logo from "./assets/logo.png";
 
 export function Overlay() {
   const closeOverlay = async () => {
-    const window = getCurrentWebviewWindow();
-    await window.hide();
+    await invoke("hide_overlay");
   };
 
   return (
