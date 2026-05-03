@@ -85,19 +85,26 @@ fn run_service_loop() -> anyhow::Result<()> {
         let mut enforce_task = None;
         let dns_proxy_ready = matches!(ready_rx.await, Ok(Ok(())));
         if dns_proxy_ready {
-            let _ = crate::dns_manager::enforce_system_dns("127.0.0.1");
+            let config_path = libreascent_shared::config::default_config_path();
+            if let Ok(config) = libreascent_shared::config::load_or_create(&config_path) {
+                if config.control_mode != libreascent_shared::config::ControlMode::Flexible {
+                    let _ = crate::dns_manager::enforce_system_dns("127.0.0.1");
 
-            enforce_task = Some(tokio::spawn(async move {
-                let mut interval = tokio::time::interval(Duration::from_secs(2));
-                loop {
-                    interval.tick().await;
-                    if let Err(e) = crate::dns_manager::enforce_system_dns("127.0.0.1") {
-                        crate::dns_manager::log_tamper_event(&format!(
-                            "DNS enforcement failed: {e}"
-                        ));
-                    }
+                    enforce_task = Some(tokio::spawn(async move {
+                        let mut interval = tokio::time::interval(Duration::from_secs(2));
+                        loop {
+                            interval.tick().await;
+                            if let Err(e) = crate::dns_manager::enforce_system_dns("127.0.0.1") {
+                                crate::dns_manager::log_tamper_event(&format!(
+                                    "DNS enforcement failed: {e}"
+                                ));
+                            }
+                        }
+                    }));
+                } else {
+                    crate::dns_manager::log_tamper_event("Flexible mode active. Automatic DNS enforcement skipped.");
                 }
-            }));
+            }
         } else {
             crate::dns_manager::log_tamper_event(
                 "DNS proxy did not start. DNS settings were not changed.",

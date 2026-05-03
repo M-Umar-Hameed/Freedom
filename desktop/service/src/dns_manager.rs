@@ -1,16 +1,25 @@
 use std::process::Command;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use anyhow::{Result, Context, anyhow};
 use std::fs::OpenOptions;
 use std::io::Write;
 use chrono::Local;
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 pub fn set_system_dns(addr: &str) -> Result<()> {
     let interfaces = get_managed_interfaces()?;
     for interface in interfaces {
         log_tamper_event(&format!("Setting DNS for interface {} to {}", interface, addr));
-        let status = Command::new("netsh")
-            .args(&["interface", "ipv4", "set", "dnsservers", &format!("name=\"{}\"", interface), "static", addr, "primary"])
-            .status()
+        let mut command = Command::new("netsh");
+        command.args(&["interface", "ipv4", "set", "dnsservers", &format!("name=\"{}\"", interface), "static", addr, "primary"]);
+
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+
+        let status = command.status()
             .with_context(|| format!("failed to set DNS for {}", interface))?;
         
         if !status.success() {
@@ -47,9 +56,13 @@ pub fn reset_system_dns() -> Result<()> {
             if is_loopback_interface(&interface) {
                 continue;
             }
-            let _ = Command::new("netsh")
-                .args(&["interface", "ipv4", "set", "dnsservers", &format!("name=\"{}\"", interface), "dhcp"])
-                .status();
+            let mut command = Command::new("netsh");
+            command.args(&["interface", "ipv4", "set", "dnsservers", &format!("name=\"{}\"", interface), "dhcp"]);
+
+            #[cfg(windows)]
+            command.creation_flags(CREATE_NO_WINDOW);
+
+            let _ = command.status();
         }
     }
 
@@ -59,39 +72,45 @@ pub fn reset_system_dns() -> Result<()> {
             if is_loopback_interface(&interface) {
                 continue;
             }
-            let _ = Command::new("netsh")
-                .args(&["interface", "ipv6", "set", "dnsservers", &format!("name=\"{}\"", interface), "dhcp"])
-                .status();
+            let mut command = Command::new("netsh");
+            command.args(&["interface", "ipv6", "set", "dnsservers", &format!("name=\"{}\"", interface), "dhcp"]);
+
+            #[cfg(windows)]
+            command.creation_flags(CREATE_NO_WINDOW);
+
+            let _ = command.status();
         }
     }
 
     // broad PowerShell reset
-    let _ = Command::new("powershell")
-        .args(&["-NoProfile", "-Command", "Get-NetAdapter | where {$_.Status -eq 'Up'} | Set-DnsClientServerAddress -ResetServerAddresses"])
-        .status();
+    let mut ps_command = Command::new("powershell");
+    ps_command.args(&["-NoProfile", "-Command", "Get-NetAdapter | where {$_.Status -eq 'Up'} | Set-DnsClientServerAddress -ResetServerAddresses"]);
+
+    #[cfg(windows)]
+    ps_command.creation_flags(CREATE_NO_WINDOW);
+
+    let _ = ps_command.status();
 
     // Flush DNS cache
-    let _ = Command::new("ipconfig")
-        .arg("/flushdns")
-        .status();
+    let mut flush_command = Command::new("ipconfig");
+    flush_command.arg("/flushdns");
+
+    #[cfg(windows)]
+    flush_command.creation_flags(CREATE_NO_WINDOW);
+
+    let _ = flush_command.status();
 
     Ok(())
 }
 
-fn get_connected_interfaces_ipv6() -> Result<Vec<String>> {
-    let output = Command::new("netsh")
-        .args(&["interface", "ipv6", "show", "interfaces"])
-        .output()
-        .context("failed to list ipv6 interfaces")?;
-    
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(parse_connected_interfaces(&stdout))
-}
-
 pub fn is_dns_set_correctly(addr: &str) -> Result<bool> {
-    let output = Command::new("netsh")
-        .args(&["interface", "ipv4", "show", "dnsservers"])
-        .output()
+    let mut command = Command::new("netsh");
+    command.args(&["interface", "ipv4", "show", "dnsservers"]);
+
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let output = command.output()
         .context("failed to show DNS servers")?;
     
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -117,9 +136,13 @@ fn get_managed_interfaces() -> Result<Vec<String>> {
 }
 
 fn get_connected_interfaces() -> Result<Vec<String>> {
-    let output = Command::new("netsh")
-        .args(&["interface", "ipv4", "show", "interfaces"])
-        .output()
+    let mut command = Command::new("netsh");
+    command.args(&["interface", "ipv4", "show", "interfaces"]);
+
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let output = command.output()
         .context("failed to list interfaces")?;
     
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -155,6 +178,20 @@ fn interface_dns_section_contains(output: &str, interface: &str, addr: &str) -> 
         .find("Configuration for interface \"")
         .unwrap_or(rest.len());
     rest[..next_section].contains(addr)
+}
+
+fn get_connected_interfaces_ipv6() -> Result<Vec<String>> {
+    let mut command = Command::new("netsh");
+    command.args(&["interface", "ipv6", "show", "interfaces"]);
+
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let output = command.output()
+        .context("failed to list ipv6 interfaces")?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_connected_interfaces(&stdout))
 }
 
 #[cfg(test)]

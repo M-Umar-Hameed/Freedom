@@ -115,33 +115,63 @@ async fn forward_to_upstreams(
     upstreams: &[SocketAddr],
     buffer: &mut [u8],
 ) -> Result<usize> {
-    let mut last_error = None;
+    use tokio::sync::mpsc;
+
+    let (tx, mut rx) = mpsc::channel(upstreams.len());
+    let mut handles = Vec::new();
 
     for upstream in upstreams {
-        if let Err(e) = upstream_socket.send_to(request, *upstream).await {
-            last_error = Some(anyhow::anyhow!("failed to send to {upstream}: {e}"));
-            continue;
-        }
+        let upstream = *upstream;
+        let request = request.to_vec();
+        let tx = tx.clone();
+        
+        let handle = tokio::spawn(async move {
+            let socket = match UdpSocket::bind("0.0.0.0:0").await {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            
+            if let Err(_) = socket.send_to(&request, upstream).await {
+                return;
+            }
 
-        loop {
-            match timeout(UPSTREAM_TIMEOUT, upstream_socket.recv_from(buffer)).await {
-                Ok(Ok((upstream_size, _))) => return Ok(upstream_size),
-                Ok(Err(e)) if e.kind() == std::io::ErrorKind::ConnectionReset => {
-                    continue;
-                }
-                Ok(Err(e)) => {
-                    last_error = Some(anyhow::anyhow!("failed to receive from {upstream}: {e}"));
-                    break;
-                }
-                Err(_) => {
-                    last_error = Some(anyhow::anyhow!("timed out waiting for {upstream}"));
-                    break;
+            let mut buf = vec![0_u8; 4096];
+            loop {
+                match timeout(UPSTREAM_TIMEOUT, socket.recv_from(&mut buf)).await {
+                    Ok(Ok((size, _))) => {
+                        let _ = tx.send(buf[..size].to_vec()).await;
+                        return;
+                    }
+                    Ok(Err(e)) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                        continue;
+                    }
+                    _ => return,
                 }
             }
-        }
+        });
+        handles.push(handle);
     }
 
-    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("no upstreams available")))
+    // Wait for the first successful response
+    let result = match rx.recv().await {
+        Some(response) => {
+            let size = response.len();
+            if size <= buffer.len() {
+                buffer[..size].copy_from_slice(&response);
+                Ok(size)
+            } else {
+                Err(anyhow::anyhow!("DNS response too large"))
+            }
+        }
+        None => Err(anyhow::anyhow!("all upstreams failed or timed out")),
+    };
+
+    // Abort all tasks to clean up sockets
+    for handle in handles {
+        handle.abort();
+    }
+
+    result
 }
 
 pub async fn local_dns_proxy_responds() -> Result<bool> {
