@@ -65,10 +65,11 @@ pub async fn run_local_dns_proxy_with_ready(
             Err(e) => return Err(e).context("failed to receive DNS packet"),
         };
         let request = buffer[..size].to_vec();
+        let request_id = get_request_id(&request);
         let blocklist = config_loader::load_blocklist(&config_path);
-
         match build_block_response_if_needed(&request, &blocklist) {
             Ok(Some(response)) => {
+                crate::dns_manager::log_tamper_event(&format!("Blocked: {request_id:04x}"));
                 let _ = socket.send_to(&response, peer).await;
 
                 if let Some(ref b_socket) = broadcast_socket {
@@ -87,15 +88,24 @@ pub async fn run_local_dns_proxy_with_ready(
 
         match forward_to_upstreams(&upstream_socket, &request, &upstreams, &mut buffer).await {
             Ok(upstream_size) => {
+                crate::dns_manager::log_tamper_event(&format!("Resolved: {request_id:04x}"));
                 let _ = socket.send_to(&buffer[..upstream_size], peer).await;
             }
             Err(error) => {
                 if let Ok(response) = build_error_response(&request, ResponseCode::ServFail) {
                     let _ = socket.send_to(&response, peer).await;
                 }
-                crate::dns_manager::log_tamper_event(&format!("DNS all upstreams failed: {error}"));
+                crate::dns_manager::log_tamper_event(&format!("Failed: {request_id:04x} - {error}"));
             }
         }
+    }
+}
+
+fn get_request_id(request: &[u8]) -> u16 {
+    if request.len() < 2 {
+        0
+    } else {
+        u16::from_be_bytes([request[0], request[1]])
     }
 }
 

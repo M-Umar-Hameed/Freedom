@@ -39,8 +39,9 @@ pub fn log_tamper_event(message: &str) {
 }
 
 pub fn reset_system_dns() -> Result<()> {
-    log_tamper_event("Resetting system DNS to DHCP/Automatic.");
-    // Try netsh first
+    log_tamper_event("Resetting system DNS to DHCP/Automatic (IPv4 and IPv6).");
+    
+    // IPv4
     if let Ok(interfaces) = get_connected_interfaces() {
         for interface in interfaces {
             if is_loopback_interface(&interface) {
@@ -52,13 +53,39 @@ pub fn reset_system_dns() -> Result<()> {
         }
     }
 
-    // Always follow up with a broad PowerShell reset as a fallback/safety measure
-    // This requires admin, same as netsh
+    // IPv6
+    if let Ok(interfaces) = get_connected_interfaces_ipv6() {
+        for interface in interfaces {
+            if is_loopback_interface(&interface) {
+                continue;
+            }
+            let _ = Command::new("netsh")
+                .args(&["interface", "ipv6", "set", "dnsservers", &format!("name=\"{}\"", interface), "dhcp"])
+                .status();
+        }
+    }
+
+    // broad PowerShell reset
     let _ = Command::new("powershell")
         .args(&["-NoProfile", "-Command", "Get-NetAdapter | where {$_.Status -eq 'Up'} | Set-DnsClientServerAddress -ResetServerAddresses"])
         .status();
 
+    // Flush DNS cache
+    let _ = Command::new("ipconfig")
+        .arg("/flushdns")
+        .status();
+
     Ok(())
+}
+
+fn get_connected_interfaces_ipv6() -> Result<Vec<String>> {
+    let output = Command::new("netsh")
+        .args(&["interface", "ipv6", "show", "interfaces"])
+        .output()
+        .context("failed to list ipv6 interfaces")?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_connected_interfaces(&stdout))
 }
 
 pub fn is_dns_set_correctly(addr: &str) -> Result<bool> {
