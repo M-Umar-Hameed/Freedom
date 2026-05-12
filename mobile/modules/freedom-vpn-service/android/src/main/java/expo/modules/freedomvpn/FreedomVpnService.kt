@@ -48,8 +48,8 @@ class FreedomVpnService : VpnService() {
         private const val MAX_PACKET_SIZE = 32767
 
         // Cloudflare Family DNS — blocks malware AND adult content
-        private const val DNS_PRIMARY = "1.1.1.3"
-        private const val DNS_SECONDARY = "1.0.0.3"
+        private const val DNS_PRIMARY = "1.1.1.1"
+        private const val DNS_SECONDARY = "1.0.0.1"
         private const val DNS_TIMEOUT_MS = 5000
 
         @Volatile
@@ -112,8 +112,12 @@ class FreedomVpnService : VpnService() {
     /**
      * Establish the TUN interface.
      *
-     * We configure the VPN to capture DNS traffic only by setting
-     * the VPN's DNS servers and routing only DNS (port 53) through the tunnel.
+     * We configure the VPN to capture DNS traffic by setting the VPN's DNS
+     * servers and routing only those DNS server IPs through the tunnel.
+     * VpnService routes by address, not port, so routing 0.0.0.0/0 would send
+     * all app and system traffic here. This service only forwards DNS packets,
+     * so full-device routing can break non-DNS traffic such as carrier/IMS
+     * services on some phones.
      */
     private fun establishVpn(): Boolean {
         return try {
@@ -122,9 +126,9 @@ class FreedomVpnService : VpnService() {
                 .setMtu(MTU)
                 // Assign a private IP to the TUN interface
                 .addAddress("10.0.0.2", 32)
-                // Route only DNS traffic through the VPN
-                // We use addRoute to capture all traffic, then handle DNS only
-                .addRoute("0.0.0.0", 0)
+                // Route only our configured DNS resolvers through the VPN.
+                .addRoute(DNS_PRIMARY, 32)
+                .addRoute(DNS_SECONDARY, 32)
                 // Set our own DNS servers (these trigger DNS through the tunnel)
                 .addDnsServer(DNS_PRIMARY)
                 .addDnsServer(DNS_SECONDARY)

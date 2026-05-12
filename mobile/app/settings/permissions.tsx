@@ -21,23 +21,36 @@ export default function PermissionsScreen(): ReactNode {
   const [pendingPermission, setPendingPermission] = useState<string | null>(
     null,
   );
+  const [vpnPrepared, setVpnPrepared] = useState(false);
+  const [accessibilityPermission, setAccessibilityPermission] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       const checkPermissions = async (): Promise<void> => {
-        const [vpn, accessibility, overlay, deviceAdmin] = await Promise.all([
+        const [
+          vpnPermissionReady,
+          vpnActive,
+          accessibilityEnabled,
+          accessibilityRunning,
+          overlay,
+          deviceAdmin,
+        ] = await Promise.all([
           FreedomVpn.isVpnPrepared(),
+          FreedomVpn.isVpnActive(),
           FreedomAccessibility.isAccessibilityEnabled(),
+          FreedomAccessibility.isServiceRunning(),
           FreedomOverlay.hasOverlayPermission(),
           FreedomDeviceAdmin.isAdminActive(),
         ]);
 
         setProtection({
-          vpn,
-          accessibility,
+          vpn: vpnActive,
+          accessibility: accessibilityEnabled && accessibilityRunning,
           overlay,
           deviceAdmin,
         });
+        setVpnPrepared(vpnPermissionReady);
+        setAccessibilityPermission(accessibilityEnabled);
       };
 
       void checkPermissions();
@@ -55,14 +68,14 @@ export default function PermissionsScreen(): ReactNode {
       id: "vpn",
       title: "VPN Service",
       description: "Required for system-wide content blocking",
-      status: protection.vpn,
+      status: vpnPrepared,
       icon: "shield-checkmark-outline",
     },
     {
       id: "accessibility",
       title: "Accessibility Service",
       description: "Monitors browsers and detects social media reels",
-      status: protection.accessibility,
+      status: accessibilityPermission,
       icon: "accessibility-outline",
     },
     {

@@ -10,7 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function DashboardScreen(): ReactNode {
   const t = useAppTheme();
   const stats = useAppStore((state) => state.stats);
-  const { controlMode, schedule } = useAppStore();
+  const { controlMode, protection, schedule } = useAppStore();
   const keywordsCount = useBlockingStore((state) => state.keywords.length);
   const domainsBlockedCount = useBlockingStore(
     (state) => state.includedUrls.length,
@@ -18,6 +18,14 @@ export default function DashboardScreen(): ReactNode {
 
   const isScheduled = ProtectionService.isProtectionEnabledBySchedule();
   const hasSchedule = schedule.length > 0;
+  const coreProtectionActive =
+    protection.vpn && protection.accessibility && protection.foregroundService;
+  const isProtectionActive = isScheduled && coreProtectionActive;
+  const statusLabel = !isScheduled
+    ? "Protection Paused"
+    : isProtectionActive
+      ? "Protection Active"
+      : "Protection Needs Setup";
 
   const modeInfo = {
     flexible: {
@@ -84,9 +92,15 @@ export default function DashboardScreen(): ReactNode {
           </View>
           <Text
             className="text-2xl font-black text-center tracking-tighter leading-tight"
-            style={{ color: isScheduled ? t.accentColor : t.mutedTextColor }}
+            style={{
+              color: isProtectionActive
+                ? t.accentColor
+                : !isScheduled
+                  ? t.mutedTextColor
+                  : t.warningColor,
+            }}
           >
-            {isScheduled ? "Protection Active" : "Protection Paused"}
+            {statusLabel}
           </Text>
           <View
             className="flex-row items-center mt-3 px-3 py-1 rounded-full"
@@ -106,6 +120,11 @@ export default function DashboardScreen(): ReactNode {
           {hasSchedule && (
             <Text className="mt-2 text-xs" style={{ color: t.mutedTextColor }}>
               {isScheduled ? "Within scheduled time" : "Outside scheduled time"}
+            </Text>
+          )}
+          {isScheduled && !coreProtectionActive && (
+            <Text className="mt-2 text-xs" style={{ color: t.warningColor }}>
+              VPN, Accessibility, and foreground service must all be active.
             </Text>
           )}
         </View>

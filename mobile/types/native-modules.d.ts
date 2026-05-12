@@ -8,6 +8,7 @@ declare module "freedom-vpn-service" {
   export function startVpn(): Promise<void>;
   export function stopVpn(): Promise<void>;
   export function isVpnActive(): Promise<boolean>;
+  export function isVpnPrepared(): Promise<boolean>;
   export function prepareVpn(): Promise<boolean>;
   export function updateBlocklist(domains: string[]): Promise<void>;
   export function addCategory(name: string, domains: string[]): Promise<void>;
@@ -25,6 +26,7 @@ declare module "freedom-vpn-service" {
 
 declare module "freedom-accessibility-service" {
   export function isAccessibilityEnabled(): Promise<boolean>;
+  export function isServiceRunning(): Promise<boolean>;
   export function openAccessibilitySettings(): Promise<void>;
   export function updateBrowserConfigs(
     configs: {
@@ -42,7 +44,30 @@ declare module "freedom-accessibility-service" {
   ): Promise<void>;
   export function updateBlockedDomains(domains: string[]): Promise<void>;
   export function updateBlockedKeywords(keywords: string[]): Promise<void>;
+  export function updateBlockedApps(
+    configs: {
+      packageName: string;
+      appName: string;
+      surveillanceType: string;
+      surveillanceValue: number;
+      startTime?: string;
+      endTime?: string;
+    }[],
+  ): Promise<void>;
   export function updateWhitelist(domains: string[]): Promise<void>;
+  export function getProtectionSnapshot(): Promise<{
+    serviceRunning: boolean;
+    blockedApps: number;
+    keywords: number;
+    includedDomains: number;
+    whitelist: number;
+    adultBlockingEnabled: boolean;
+    perCategoryMode: boolean;
+    enabledCategories: number;
+    categoryDomains: number;
+    adultCategoryDomains: number;
+    hentaiCategoryDomains: number;
+  }>;
   export function onUrlBlocked(
     listener: (event: {
       url: string;

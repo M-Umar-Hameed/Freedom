@@ -156,6 +156,15 @@ export const useAppStore = create<AppState>()(
     {
       name: "freedom-app-store",
       storage: createJSONStorage(() => sqliteStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setProtection({
+          vpn: false,
+          accessibility: false,
+          overlay: false,
+          deviceAdmin: false,
+          foregroundService: false,
+        });
+      },
     },
   ),
 );

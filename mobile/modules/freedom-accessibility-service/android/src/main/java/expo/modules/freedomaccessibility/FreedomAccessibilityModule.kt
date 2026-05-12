@@ -65,6 +65,10 @@ class FreedomAccessibilityModule : Module() {
             }
         }
 
+        AsyncFunction("isServiceRunning") { promise: Promise ->
+            promise.resolve(FreedomAccessibilityService.isRunning)
+        }
+
         AsyncFunction("openAccessibilitySettings") { promise: Promise ->
             try {
                 val activity = appContext.currentActivity
@@ -299,6 +303,30 @@ class FreedomAccessibilityModule : Module() {
                 promise.resolve(null)
             } catch (e: Exception) {
                 promise.reject("ERR_INCLUDED_DOMAINS", e.message, e)
+            }
+        }
+
+        AsyncFunction("getProtectionSnapshot") { promise: Promise ->
+            try {
+                val context = appContext.reactContext
+                val matcher = FreedomAccessibilityService.sharedContentMatcher
+                    ?: if (context != null) getOrCreateFallbackMatcher(context) else ContentMatcher()
+
+                promise.resolve(mapOf(
+                    "serviceRunning" to FreedomAccessibilityService.isRunning,
+                    "blockedApps" to matcher.getBlockedApps().size,
+                    "keywords" to matcher.getKeywordCount(),
+                    "includedDomains" to matcher.getIncludedDomainCount(),
+                    "whitelist" to matcher.getWhitelistCount(),
+                    "adultBlockingEnabled" to matcher.isAdultBlockingEnabled(),
+                    "perCategoryMode" to matcher.isPerCategoryMode(),
+                    "enabledCategories" to matcher.getEnabledCategoryCount(),
+                    "categoryDomains" to matcher.getTotalCategoryDomainCount(),
+                    "adultCategoryDomains" to matcher.getCategoryDomainCount("adult"),
+                    "hentaiCategoryDomains" to matcher.getCategoryDomainCount("hentai")
+                ))
+            } catch (e: Exception) {
+                promise.reject("ERR_PROTECTION_SNAPSHOT", e.message, e)
             }
         }
 

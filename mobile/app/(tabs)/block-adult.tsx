@@ -287,7 +287,7 @@ export default function BlockAdultScreen(): ReactNode {
                   {isSyncing
                     ? "Syncing..."
                     : adultBlockingEnabled
-                      ? "Protection Active"
+                      ? "Adult Blocking On"
                       : "Protection Off"}
                 </Text>
                 <Text className="text-sm" style={{ color: t.mutedTextColor }}>

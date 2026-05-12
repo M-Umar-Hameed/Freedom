@@ -329,6 +329,20 @@ class ContentMatcher {
      */
     fun getKeywords(): Set<String> = blockedKeywords.toSet()
 
+    fun getKeywordCount(): Int = blockedKeywords.size
+
+    fun getIncludedDomainCount(): Int = includedDomains.size
+
+    fun getWhitelistCount(): Int = whitelist.size
+
+    fun getEnabledCategoryCount(): Int = enabledCategories.size
+
+    fun getTotalCategoryDomainCount(): Int = categoryDomains.values.sumOf { it.size }
+
+    fun isAdultBlockingEnabled(): Boolean = adultBlockingEnabled
+
+    fun isPerCategoryMode(): Boolean = usingPerCategoryMode
+
     fun setNsfwMonitoredApps(packages: Collection<String>) {
         nsfwMonitoredApps.clear()
         packages.forEach { nsfwMonitoredApps.add(it.trim().lowercase()) }

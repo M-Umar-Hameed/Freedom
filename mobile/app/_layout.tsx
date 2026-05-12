@@ -1,7 +1,7 @@
 import { AppLockScreen } from "@/components/AppLockScreen";
 import { APP_THEMES } from "@/constants/overlay-themes";
 import { AppThemeProvider } from "@/providers/ThemeProvider";
-import { BlocklistService } from "@/services/BlocklistService";
+import { LaunchRecoveryService } from "@/services/LaunchRecoveryService";
 import { ProtectionService } from "@/services/ProtectionService";
 import { useAppStore } from "@/stores/useAppStore";
 import { useBlockingStore } from "@/stores/useBlockingStore";
@@ -38,10 +38,45 @@ export default function RootLayout(): ReactNode {
   const [isMounted, setIsMounted] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [isLocked, setIsLocked] = useState(true);
+  const [launchRecoveryComplete, setLaunchRecoveryComplete] = useState(false);
+  const [storesHydrated, setStoresHydrated] = useState(
+    () =>
+      useAppStore.persist.hasHydrated() &&
+      useBlockingStore.persist.hasHydrated(),
+  );
 
   const handleUnlock = useCallback(() => {
     setIsLocked(false);
   }, []);
+
+  useEffect(() => {
+    const updateHydration = (): void => {
+      setStoresHydrated(
+        useAppStore.persist.hasHydrated() &&
+          useBlockingStore.persist.hasHydrated(),
+      );
+    };
+
+    const unsubApp = useAppStore.persist.onFinishHydration(updateHydration);
+    const unsubBlocking =
+      useBlockingStore.persist.onFinishHydration(updateHydration);
+    updateHydration();
+
+    return () => {
+      unsubApp();
+      unsubBlocking();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!storesHydrated) return;
+    useAppStore.getState().setProtection({
+      vpn: false,
+      accessibility: false,
+      overlay: false,
+      foregroundService: false,
+    });
+  }, [storesHydrated]);
 
   // Re-lock when app comes back from background
   useEffect(() => {
@@ -96,7 +131,7 @@ export default function RootLayout(): ReactNode {
   // synced separately via BlocklistService.updateBlocklists() which calls
   // its own syncBlocklistToNative() after fetching.
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && storesHydrated && launchRecoveryComplete) {
       void ProtectionService.syncAllConfigs().catch(console.error);
     }
   }, [
@@ -109,11 +144,14 @@ export default function RootLayout(): ReactNode {
     enabledNsfwApps,
     controlMode,
     isMounted,
+    storesHydrated,
+    launchRecoveryComplete,
   ]);
 
   // Route to appropriate screen on initial load
   useEffect(() => {
-    if (!isMounted || !navigationState?.key || !fontsLoaded) return;
+    if (!isMounted || !navigationState?.key || !fontsLoaded || !storesHydrated)
+      return;
 
     const inTabs = segments[0] === "(tabs)";
     const inSettings = segments[0] === "settings";
@@ -124,13 +162,23 @@ export default function RootLayout(): ReactNode {
     } else if (!isOnboarded && !inOnboarding) {
       router.replace("/(onboarding)");
     }
-  }, [isOnboarded, navigationState?.key, isMounted, fontsLoaded, segments]);
+  }, [
+    isOnboarded,
+    navigationState?.key,
+    isMounted,
+    fontsLoaded,
+    storesHydrated,
+    segments,
+  ]);
 
   // Global event listeners for Native Services
   useEffect(() => {
     if (!isMounted || !navigationState?.key) return;
 
     const listeners = [
+      ProtectionService.onVpnStatusChanged(() => {
+        // State is updated inside ProtectionService.
+      }),
       ProtectionService.onDomainBlocked(() => {
         // Handled natively by OverlayService
       }),
@@ -146,16 +194,36 @@ export default function RootLayout(): ReactNode {
     };
   }, [isMounted, navigationState?.key]);
 
-  // On every launch: push cached domains to native (survives process death).
-  // Network updates are only triggered manually by the user.
   useEffect(() => {
-    if (!isMounted || !isOnboarded) return;
-    if (!useBlockingStore.getState().adultBlockingEnabled) return;
+    if (!isMounted || !storesHydrated || !isOnboarded) return;
 
-    void BlocklistService.syncAllCategoriesFromCache().catch((e: unknown) => {
-      console.warn("[Layout] Cache sync failed:", e);
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void ProtectionService.refreshProtectionStatus().catch(console.warn);
+      }
     });
-  }, [isMounted, isOnboarded]);
+    void ProtectionService.refreshProtectionStatus().catch(console.warn);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isMounted, storesHydrated, isOnboarded]);
+
+  // On every launch: recover protection after normal process death or manual
+  // relaunch following force-stop. Android blocks all app work while the
+  // package is force-stopped; recovery can only run once the user opens app.
+  useEffect(() => {
+    if (!isMounted || !storesHydrated || !isOnboarded || launchRecoveryComplete)
+      return;
+
+    void LaunchRecoveryService.recoverAfterLaunch()
+      .catch((e: unknown) => {
+        console.warn("[Layout] Launch recovery failed:", e);
+      })
+      .finally(() => {
+        setLaunchRecoveryComplete(true);
+      });
+  }, [isMounted, storesHydrated, isOnboarded, launchRecoveryComplete]);
 
   const appThemeId = useAppStore((s) => s.appThemeId);
   const customTheme = useAppStore((s) => s.customTheme);
@@ -180,7 +248,7 @@ export default function RootLayout(): ReactNode {
   );
 
   // Wait for both mounting and fonts to be ready for a smooth experience
-  if (!isMounted || !fontsLoaded) return null;
+  if (!isMounted || !fontsLoaded || !storesHydrated) return null;
 
   return (
     <AppThemeProvider>

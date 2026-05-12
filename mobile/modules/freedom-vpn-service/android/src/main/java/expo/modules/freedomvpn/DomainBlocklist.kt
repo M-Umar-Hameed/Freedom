@@ -37,8 +37,13 @@ class DomainBlocklist {
         // Check whitelist first (exact + suffix)
         if (matchesList(normalized, whitelist)) return false
 
-        // Check blocklist (exact + suffix)
-        return matchesList(normalized, blockedDomains)
+        if (matchesList(normalized, blockedDomains)) return true
+
+        for (categorySet in categories.values) {
+            if (matchesList(normalized, categorySet)) return true
+        }
+
+        return false
     }
 
     /**
@@ -99,7 +104,6 @@ class DomainBlocklist {
 
         val existing = categories.getOrPut(name) { ConcurrentHashMap.newKeySet() }
         existing.addAll(normalizedDomains)
-        blockedDomains.addAll(normalizedDomains)
     }
 
     /**
@@ -107,18 +111,7 @@ class DomainBlocklist {
      * Only removes domains that aren't in other active categories.
      */
     fun removeCategory(name: String) {
-        val categoryDomains = categories.remove(name) ?: return
-
-        // Collect all domains from remaining categories
-        val remainingDomains = HashSet<String>()
-        categories.values.forEach { remainingDomains.addAll(it) }
-
-        // Remove only domains that aren't in other categories
-        categoryDomains.forEach { domain ->
-            if (!remainingDomains.contains(domain)) {
-                blockedDomains.remove(domain)
-            }
-        }
+        categories.remove(name)
     }
 
     /**
@@ -137,7 +130,11 @@ class DomainBlocklist {
     /**
      * Get the total number of blocked domains.
      */
-    fun size(): Int = blockedDomains.size
+    fun size(): Int {
+        val allDomains = HashSet<String>(blockedDomains)
+        categories.values.forEach { allDomains.addAll(it) }
+        return allDomains.size
+    }
 
     /**
      * Clear everything.

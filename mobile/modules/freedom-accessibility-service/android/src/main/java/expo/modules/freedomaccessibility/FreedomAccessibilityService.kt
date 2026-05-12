@@ -134,6 +134,8 @@ class FreedomAccessibilityService : AccessibilityService() {
         val info = serviceInfo ?: AccessibilityServiceInfo()
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                AccessibilityEvent.TYPE_WINDOWS_CHANGED or
+                AccessibilityEvent.TYPE_VIEW_FOCUSED or
                 AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
         info.notificationTimeout = 100
@@ -204,8 +206,10 @@ class FreedomAccessibilityService : AccessibilityService() {
         }
 
         val isNsfwMonitored = contentMatcher.isNsfwMonitoredApp(packageName)
+        val shouldHandleAsBrowser =
+            browserMonitor.isBrowser(packageName) || isDetachedWebview
 
-        if (!browserMonitor.isBrowser(packageName) && !isDetachedWebview && !isBlockedApp && !isSettingsApp && !reelsDetector.isReelsApp(packageName) && !isNsfwMonitored) {
+        if (!shouldHandleAsBrowser && !isBlockedApp && !isSettingsApp && !reelsDetector.isReelsApp(packageName) && !isNsfwMonitored) {
             if (classNameStr.contains("browser") || classNameStr.contains("web")) {
                 Log.d(TAG, "SAMSUNG DEBUG: Ignored event from non-monitored package | Pkg: $packageName | Class: $classNameStr")
             }
@@ -234,7 +238,7 @@ class FreedomAccessibilityService : AccessibilityService() {
                         performGlobalAction(GLOBAL_ACTION_HOME)
                     }
                 }
-                browserMonitor.isBrowser(packageName) -> {
+                shouldHandleAsBrowser -> {
                     handleBrowserEvent(event, rootNode, packageName)
                 }
                 reelsDetector.isReelsApp(packageName) -> {

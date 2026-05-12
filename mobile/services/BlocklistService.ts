@@ -86,8 +86,30 @@ export const BlocklistService = {
     // Always sync flags (instant)
     await BlocklistService.syncCategoryFlagsToNative();
 
-    // If we only want to toggle flags, skip the heavy domain transfer
-    if (options?.skipResync) return;
+    // If we only want to toggle flags, skip the heavy category transfer but
+    // still restore user-managed blocked/whitelisted sites.
+    if (options?.skipResync) {
+      const activeIncluded = getActiveIncludedUrls();
+      const activeExcluded = getActiveExcludedUrls();
+
+      try {
+        await FreedomAccessibility.setIncludedDomains(activeIncluded);
+        await FreedomAccessibility.updateWhitelist(activeExcluded);
+      } catch (e) {
+        console.warn(
+          "[BlocklistService] Failed to sync URLs to Accessibility:",
+          e,
+        );
+      }
+
+      try {
+        await FreedomVpn.updateBlocklist(activeIncluded);
+        await FreedomVpn.setWhitelist(activeExcluded);
+      } catch (e) {
+        console.warn("[BlocklistService] Failed to sync URLs to VPN:", e);
+      }
+      return;
+    }
 
     // Sync per-category domains to both Accessibility and VPN in batches
     for (const category of state.categories) {
@@ -174,11 +196,19 @@ export const BlocklistService = {
   ): Promise<void> => {
     const state = useBlockingStore.getState();
     const category = state.categories.find((c) => c.id === categoryId);
-    if (!category || category.domains.length === 0) return;
+    if (!category) return;
 
     try {
       if (enabled && state.adultBlockingEnabled) {
-        await FreedomVpn.addCategory(categoryId, category.domains);
+        await FreedomVpn.removeCategory(categoryId);
+        if (category.domains.length > 0) {
+          await FreedomVpn.addCategory(categoryId, category.domains);
+        } else if (getCachedDomainCount(categoryId) > 0) {
+          await BlocklistService.syncCategoryFromCache(categoryId, {
+            syncVpn: true,
+            syncAccessibility: false,
+          });
+        }
       } else {
         await FreedomVpn.removeCategory(categoryId);
       }
@@ -505,14 +535,23 @@ export const BlocklistService = {
    * Push all cached domains for a category from SQLite to native (VPN + A11y).
    * Reads in pages to avoid loading 500k+ strings into JS at once.
    */
-  syncCategoryFromCache: async (categoryId: string): Promise<void> => {
+  syncCategoryFromCache: async (
+    categoryId: string,
+    options?: { syncVpn?: boolean; syncAccessibility?: boolean },
+  ): Promise<void> => {
+    const syncVpn = options?.syncVpn ?? true;
+    const syncAccessibility = options?.syncAccessibility ?? true;
     const PAGE = 10000;
     const totalCached = getCachedDomainCount(categoryId);
     for (let offset = 0; offset < totalCached; offset += PAGE) {
       const batch = readCachedDomainsBatch(categoryId, PAGE, offset);
       if (batch.length === 0) break;
-      await FreedomVpn.addCategory(categoryId, batch);
-      await FreedomAccessibility.appendCategoryDomains(categoryId, batch);
+      if (syncVpn) {
+        await FreedomVpn.addCategory(categoryId, batch);
+      }
+      if (syncAccessibility) {
+        await FreedomAccessibility.appendCategoryDomains(categoryId, batch);
+      }
     }
   },
 
@@ -520,7 +559,10 @@ export const BlocklistService = {
    * Push ALL enabled categories from SQLite cache to native on app launch.
    * Fast path: skips if cache is empty (fresh install — updateBlocklists will fill it).
    */
-  syncAllCategoriesFromCache: async (): Promise<void> => {
+  syncAllCategoriesFromCache: async (options?: {
+    skipMatchingNative?: boolean;
+    nativeCounts?: Record<string, number>;
+  }): Promise<void> => {
     const state = useBlockingStore.getState();
     if (!state.adultBlockingEnabled) return;
 
@@ -528,12 +570,34 @@ export const BlocklistService = {
       if (!category.enabled) continue;
       const cached = getCachedDomainCount(category.id);
       if (cached === 0) continue;
+      const existingNativeCount =
+        options?.nativeCounts?.[category.id] ??
+        (options?.skipMatchingNative
+          ? await FreedomAccessibility.getCategoryDomainCount(category.id)
+          : 0);
+
+      const accessibilityAlreadyCurrent =
+        options?.skipMatchingNative && existingNativeCount === cached;
 
       try {
         await FreedomVpn.removeCategory(category.id);
       } catch { /* might not exist */ }
 
-      await BlocklistService.syncCategoryFromCache(category.id);
+      await BlocklistService.syncCategoryFromCache(category.id, {
+        syncVpn: true,
+        syncAccessibility: !accessibilityAlreadyCurrent,
+      });
+
+      if (accessibilityAlreadyCurrent) {
+        useBlockingStore
+          .getState()
+          .setCategoryDomainCount(category.id, existingNativeCount);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[BlocklistService] ${category.id}: accessibility cache already current (${existingNativeCount}); VPN cache reloaded`,
+        );
+        continue;
+      }
 
       try {
         await FreedomAccessibility.finalizeCategorySync(category.id);

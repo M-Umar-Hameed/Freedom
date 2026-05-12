@@ -4,6 +4,7 @@ import { REELS_APPS } from "@/constants/reels";
 import { getResolvedTheme } from "@/constants/overlay-themes";
 import { incrementDailyBlockedCount, logBlockedUrl } from "@/db/database";
 import * as FreedomAccessibility from "@/modules/freedom-accessibility-service/src";
+import * as FreedomForeground from "@/modules/freedom-foreground-service/src";
 import * as FreedomOverlay from "@/modules/freedom-overlay/src";
 import * as FreedomVpn from "@/modules/freedom-vpn-service/src";
 import { BlockingCategory } from "@/types/blocking";
@@ -24,10 +25,12 @@ export const ProtectionService = {
    */
   startProtection: async (): Promise<boolean> => {
     try {
+      await FreedomForeground.startService();
       await ProtectionService.syncAllConfigs();
       await FreedomVpn.startVpn();
-      useAppStore.getState().setProtection({ vpn: true });
-      return true;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const status = await ProtectionService.refreshProtectionStatus();
+      return status.vpn;
     } catch (error) {
       console.error("[ProtectionService] Failed to start protection:", error);
       return false;
@@ -53,8 +56,38 @@ export const ProtectionService = {
     return FreedomVpn.isVpnActive();
   },
 
+  refreshProtectionStatus: async (): Promise<{
+    vpn: boolean;
+    accessibility: boolean;
+    foregroundService: boolean;
+    overlay: boolean;
+  }> => {
+    const [
+      vpn,
+      accessibilityEnabled,
+      accessibilityRunning,
+      foregroundService,
+      overlay,
+    ] = await Promise.all([
+      FreedomVpn.isVpnActive(),
+      FreedomAccessibility.isAccessibilityEnabled(),
+      FreedomAccessibility.isServiceRunning(),
+      FreedomForeground.isServiceRunning(),
+      FreedomOverlay.hasOverlayPermission(),
+    ]);
+    const status = {
+      vpn,
+      accessibility: accessibilityEnabled && accessibilityRunning,
+      foregroundService,
+      overlay,
+    };
+    useAppStore.getState().setProtection(status);
+    return status;
+  },
+
   _syncTimeout: null as ReturnType<typeof setTimeout> | null,
   _pendingResolve: null as (() => void) | null,
+  _syncChain: Promise.resolve(),
   _lastUrlContent: "" as string, // Hash of last synced URLs
   _lastCategoryContent: "" as string, // Hash of last synced category config
 
@@ -85,7 +118,7 @@ export const ProtectionService = {
     return new Promise((resolve) => {
       ProtectionService._pendingResolve = resolve;
       ProtectionService._syncTimeout = setTimeout(() => {
-        void (async () => {
+        ProtectionService._syncChain = ProtectionService._syncChain.then(async () => {
           try {
             const state = useBlockingStore.getState();
 
@@ -113,15 +146,14 @@ export const ProtectionService = {
             const categoriesChanged =
               currentCategoryContent !== ProtectionService._lastCategoryContent;
 
-            if (!options?.skipResync) {
-              if (categoriesChanged) {
+            if (categoriesChanged && !options?.skipResync) {
                 // Full domain sync — categories changed (after updateBlocklists)
                 await BlocklistService.syncDomainsToNative({
                   skipResync: false,
                 });
                 ProtectionService._lastCategoryContent = currentCategoryContent;
                 ProtectionService._lastUrlContent = currentUrlContent;
-              } else if (urlsChanged) {
+              } else if (urlsChanged || options?.skipResync) {
                 // Lightweight URL-only sync — only enabled URLs
                 await FreedomAccessibility.setIncludedDomains(activeIncluded);
                 await FreedomAccessibility.updateWhitelist(activeExcluded);
@@ -129,7 +161,6 @@ export const ProtectionService = {
                 await FreedomVpn.updateBlocklist(activeIncluded);
                 ProtectionService._lastUrlContent = currentUrlContent;
               }
-            }
 
             // 3. Sync other parts in parallel
             const appState = useAppStore.getState();
@@ -162,13 +193,24 @@ export const ProtectionService = {
             await FreedomAccessibility.updateHardcoreMode(
               controlMode === "hardcore",
             );
+            // eslint-disable-next-line no-console
+            console.log("[ProtectionService] Synced configs", {
+              includedUrls: activeIncluded.length,
+              excludedUrls: activeExcluded.length,
+              blockedApps: state.blockedApps.filter((app) => app.enabled)
+                .length,
+              keywords: state.keywords.length,
+              reelsApps: state.enabledReelsApps.length,
+              nsfwApps: state.enabledNsfwApps.length,
+              skippedCategoryDomainResync: Boolean(options?.skipResync),
+            });
           } catch (e) {
             console.error("[ProtectionService] Sync failed:", e);
           } finally {
             ProtectionService._pendingResolve = null;
             resolve();
           }
-        })();
+        });
       }, 300); // 300ms debounce
     });
   },

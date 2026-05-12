@@ -5,6 +5,7 @@ import {
 
 interface FreedomAccessibilityModuleInterface {
   isAccessibilityEnabled(): Promise<boolean>;
+  isServiceRunning(): Promise<boolean>;
   openAccessibilitySettings(): Promise<void>;
   updateBrowserConfigs(
     configs: {
@@ -43,6 +44,19 @@ interface FreedomAccessibilityModuleInterface {
   finalizeCategorySync(categoryId: string): Promise<void>;
   setCategoryEnabled(categoryId: string, enabled: boolean): Promise<void>;
   setIncludedDomains(domains: string[]): Promise<void>;
+  getProtectionSnapshot(): Promise<{
+    serviceRunning: boolean;
+    blockedApps: number;
+    keywords: number;
+    includedDomains: number;
+    whitelist: number;
+    adultBlockingEnabled: boolean;
+    perCategoryMode: boolean;
+    enabledCategories: number;
+    categoryDomains: number;
+    adultCategoryDomains: number;
+    hentaiCategoryDomains: number;
+  }>;
   getInstalledApps(): Promise<
     { name: string; packageName: string; icon?: string }[]
   >;
@@ -65,6 +79,11 @@ try {
 export async function isAccessibilityEnabled(): Promise<boolean> {
   if (!FreedomAccessibilityNative) return false;
   return FreedomAccessibilityNative.isAccessibilityEnabled();
+}
+
+export async function isServiceRunning(): Promise<boolean> {
+  if (!FreedomAccessibilityNative) return false;
+  return FreedomAccessibilityNative.isServiceRunning();
 }
 
 export async function openAccessibilitySettings(): Promise<void> {
@@ -189,6 +208,37 @@ export async function setCategoryEnabled(
 export async function setIncludedDomains(domains: string[]): Promise<void> {
   if (!FreedomAccessibilityNative) return;
   return FreedomAccessibilityNative.setIncludedDomains(domains);
+}
+
+export async function getProtectionSnapshot(): Promise<{
+  serviceRunning: boolean;
+  blockedApps: number;
+  keywords: number;
+  includedDomains: number;
+  whitelist: number;
+  adultBlockingEnabled: boolean;
+  perCategoryMode: boolean;
+  enabledCategories: number;
+  categoryDomains: number;
+  adultCategoryDomains: number;
+  hentaiCategoryDomains: number;
+}> {
+  if (!FreedomAccessibilityNative) {
+    return {
+      serviceRunning: false,
+      blockedApps: 0,
+      keywords: 0,
+      includedDomains: 0,
+      whitelist: 0,
+      adultBlockingEnabled: false,
+      perCategoryMode: false,
+      enabledCategories: 0,
+      categoryDomains: 0,
+      adultCategoryDomains: 0,
+      hentaiCategoryDomains: 0,
+    };
+  }
+  return FreedomAccessibilityNative.getProtectionSnapshot();
 }
 
 export async function getInstalledApps(): Promise<
