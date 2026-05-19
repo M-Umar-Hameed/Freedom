@@ -3,6 +3,7 @@ mod dns;
 mod updater;
 mod service_manager;
 mod dns_manager;
+mod firewall_manager;
 mod process_manager;
 
 use anyhow::{bail, Result};
@@ -61,6 +62,7 @@ async fn main() -> Result<()> {
             let config = libreascent_shared::config::load_or_create(&default_config_path())?;
             let mut sys = process_manager::create_system_handle();
             process_manager::check_and_block_apps(&mut sys, &config);
+            firewall_manager::ensure_firewall_protection(&config, &[])?;
         }
         Some("service-run") => {
             service_manager::run_service()?;

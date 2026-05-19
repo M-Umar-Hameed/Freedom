@@ -214,7 +214,7 @@ fn dns_probe_query() -> Result<Vec<u8>> {
     message.set_message_type(MessageType::Query);
     message.set_recursion_desired(true);
     message.add_query(Query::query(
-        Name::from_ascii("pornhub.com.").context("failed to build DNS health-check name")?,
+        Name::from_ascii("cloudflare.com.").context("failed to build DNS health-check name")?,
         RecordType::A,
     ));
     message

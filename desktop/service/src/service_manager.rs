@@ -1,5 +1,6 @@
 use std::ffi::OsString;
-use std::time::Duration;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
 use tokio::sync::oneshot;
 use windows_service::{
     define_windows_service,
@@ -116,12 +117,33 @@ fn run_service_loop() -> anyhow::Result<()> {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             let broadcast_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.ok();
             let mut sys = crate::process_manager::create_system_handle();
+            let mut runtime_blocked_paths: Vec<PathBuf> = Vec::new();
+            let mut last_firewall_refresh = Instant::now() - Duration::from_secs(60);
 
             loop {
                 interval.tick().await;
                 let config_path = libreascent_shared::config::default_config_path();
                 if let Ok(config) = libreascent_shared::config::load_or_create(&config_path) {
-                    let blocked = crate::process_manager::check_and_block_apps(&mut sys, &config);
+                    let blocked_paths = crate::process_manager::check_and_block_apps(&mut sys, &config);
+                    let blocked = !blocked_paths.is_empty();
+
+                    for path in blocked_paths {
+                        if !runtime_blocked_paths.contains(&path) {
+                            runtime_blocked_paths.push(path);
+                        }
+                    }
+
+                    if blocked || last_firewall_refresh.elapsed() >= Duration::from_secs(10) {
+                        if let Err(e) = crate::firewall_manager::ensure_firewall_protection(
+                            &config,
+                            &runtime_blocked_paths,
+                        ) {
+                            crate::dns_manager::log_tamper_event(&format!(
+                                "Firewall enforcement failed: {e}"
+                            ));
+                        }
+                        last_firewall_refresh = Instant::now();
+                    }
 
                     if blocked {
                         if let Some(ref socket) = broadcast_socket {
@@ -152,6 +174,7 @@ fn run_service_loop() -> anyhow::Result<()> {
 
         if !is_hardcore {
             let _ = crate::dns_manager::reset_system_dns();
+            let _ = crate::firewall_manager::reset_firewall_protection();
         } else if matches!(event, Some(ServiceEvent::DnsProxyStopped)) {
             crate::dns_manager::log_tamper_event(
                 "DNS proxy stopped in Hardcore mode. DNS NOT reset.",
@@ -203,6 +226,7 @@ pub fn install_service() -> anyhow::Result<()> {
 
 pub fn uninstall_service() -> anyhow::Result<()> {
     let _ = crate::dns_manager::reset_system_dns();
+    let _ = crate::firewall_manager::reset_firewall_protection();
 
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
     let service = manager.open_service(

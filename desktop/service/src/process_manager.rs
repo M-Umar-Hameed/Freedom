@@ -1,41 +1,90 @@
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 use libreascent_shared::config::DesktopConfig;
+use std::path::PathBuf;
 
-pub fn check_and_block_apps(sys: &mut System, config: &DesktopConfig) -> bool {
-    if config.blocked_apps.is_empty() {
-        return false;
+const DEFAULT_NETWORK_BYPASS_EXECUTABLES: &[&str] = &[
+    "cloudflare warp",
+    "cloudflare warp.exe",
+    "warp-cli",
+    "warp-cli.exe",
+    "warp-svc",
+    "warp-svc.exe",
+];
+
+pub fn check_and_block_apps(sys: &mut System, config: &DesktopConfig) -> Vec<PathBuf> {
+    if config.blocked_apps.is_empty() && DEFAULT_NETWORK_BYPASS_EXECUTABLES.is_empty() {
+        return Vec::new();
     }
 
     sys.refresh_processes(ProcessesToUpdate::All, true);
-    let mut blocked_any = false;
+    let mut blocked_paths = Vec::new();
 
     for (pid, process) in sys.processes() {
         let exe_name = process.name().to_string_lossy().to_lowercase();
-        
-        for rule in &config.blocked_apps {
-            let rule_exe = rule.executable.to_lowercase();
-            let mut matched = exe_name == rule_exe || exe_name == format!("{}.exe", rule_exe);
+        let exe_path = process.exe().map(|path| path.to_string_lossy().to_string());
 
-            if !matched {
-                if let Some(path) = process.exe() {
-                    let path_str = path.to_string_lossy().to_lowercase();
-                    if path_str.contains(&rule_exe) {
-                        matched = true;
-                    }
-                }
+        if should_block_process(&exe_name, exe_path.as_deref(), config) {
+            println!("Blocking app: {} (PID: {:?})", exe_name, pid);
+            if let Some(path) = process.exe() {
+                blocked_paths.push(path.to_path_buf());
             }
-
-            if matched {
-                println!("Blocking app: {} (PID: {:?})", exe_name, pid);
-                let _ = process.kill();
-                blocked_any = true;
-            }
+            let _ = process.kill();
         }
     }
 
-    blocked_any
+    blocked_paths.sort();
+    blocked_paths.dedup();
+    blocked_paths
 }
 
 pub fn create_system_handle() -> System {
     System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))
+}
+
+fn should_block_process(exe_name: &str, exe_path: Option<&str>, config: &DesktopConfig) -> bool {
+    let exe_name = exe_name.to_lowercase();
+    let exe_path = exe_path.map(|path| path.to_lowercase());
+
+    if DEFAULT_NETWORK_BYPASS_EXECUTABLES
+        .iter()
+        .any(|rule| executable_matches(&exe_name, exe_path.as_deref(), rule))
+    {
+        return true;
+    }
+
+    config.blocked_apps.iter().any(|rule| {
+        executable_matches(&exe_name, exe_path.as_deref(), &rule.executable.to_lowercase())
+    })
+}
+
+fn executable_matches(exe_name: &str, exe_path: Option<&str>, rule_exe: &str) -> bool {
+    exe_name == rule_exe
+        || exe_name == format!("{rule_exe}.exe")
+        || exe_path
+            .map(|path| path.contains(rule_exe))
+            .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libreascent_shared::config::default_config;
+
+    #[test]
+    fn blocks_cloudflare_warp_as_builtin_bypass_tool() {
+        let config = default_config();
+
+        assert!(should_block_process(
+            "warp-svc.exe",
+            Some(r"C:\Program Files\Cloudflare\Cloudflare WARP\warp-svc.exe"),
+            &config,
+        ));
+    }
+
+    #[test]
+    fn allows_unconfigured_normal_process() {
+        let config = default_config();
+
+        assert!(!should_block_process("notepad.exe", None, &config));
+    }
 }
